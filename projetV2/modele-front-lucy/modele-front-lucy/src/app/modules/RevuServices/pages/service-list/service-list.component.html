@@ -1,0 +1,224 @@
+<div *ngIf="!profilCharge" class="status-message loading-message">
+  <span class="status-indicator"></span>Vérification du profil...
+</div>
+
+<div *ngIf="profilCharge && !estChef" class="alert alert-danger">
+  {{ erreurProfil || 'Accès refusé. Seul un Chef de Service peut voir cette page.' }}
+</div>
+
+<ng-container *ngIf="estChef">
+<div class="main-content">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="container-fluid service-page">
+            <header class="page-heading">
+              <div class="heading-mark"><i class="now-ui-icons business_bank"></i></div>
+              <div>
+                <p class="heading-kicker">ORGANISATION</p>
+                <h2>Services et affectations</h2>
+                <p class="heading-description">Retrouvez les agents, leurs fonctions et les applications rattachées à
+                  chaque section.</p>
+              </div>
+            </header>
+            
+
+            <div *ngIf="chargement" class="status-message loading-message">
+              <span class="status-indicator"></span>Chargement des services...
+            </div>
+
+            <div *ngIf="erreur" class="status-message error-message">{{ erreur }}</div>
+
+            <section class="service-picker">
+              <h2 class="h">Filtres</h2>
+
+              <div *ngIf="!chargement && !erreur" class="filter-ligne">
+
+                <div class="filter-group">
+                  <label for="serviceSelect">Sélectionner un service</label>
+                  <select id="serviceSelect" class="form-control" [(ngModel)]="serviceARechercher">
+                    <option value="">Choisir un service...</option>
+                    <option *ngFor="let s of services" [value]="s.codeService">
+                      {{ s.libelleService }}
+                    </option>
+                  </select>
+                </div>
+
+                <div class="filter-actions">
+                  <button type="button" class="search-button" [disabled]="!serviceARechercher"
+                    (click)="rechercherService()">
+                    Rechercher
+                  </button>
+                  <button type="button" class="clear-button" [disabled]="!serviceARechercher && !serviceSelectionne"
+                    (click)="effacerFiltre()">
+                    Effacer filtre
+                  </button>
+                </div>
+
+              </div>
+            </section>
+
+            <div *ngIf="serviceSelectionne" class="results-layout">
+              <section class="agent-results">
+              <div *ngIf="chargementDetails" class="status-message loading-message">
+                <span class="status-indicator"></span>Chargement des détails...
+              </div>
+              <div *ngIf="erreurDetails" class="status-message error-message">{{ erreurDetails }}</div>
+
+              <p *ngIf="!chargementDetails && !erreurDetails && agentsAffiches.length === 0" class="empty-state">
+                <i class="now-ui-icons users_single-02"></i>
+                <strong>Aucun agent actif pour ce service</strong>
+                <span>Essayez de sélectionner un autre service.</span>
+              </p>
+
+              <div *ngIf="!chargementDetails && !erreurDetails && agentsAffiches.length > 0" class="agent-list">
+                <article *ngFor="let agent of agentsAffiches" class="agent-card">
+                  <header class="header-agent">
+                    <div class="agent-identity">
+
+                      <span class="agent-icon" aria-hidden="true"></span>
+                      <h3>
+                        {{ agent.matricule }} - {{ agent.nom }} {{ agent.prenoms }}
+                      </h3>
+                      </div>
+                      </header>
+                      <div class="header-fonction">
+                      <span class="label">Fonction  :</span>
+                      <span class="value"> {{ agent.libelleFonction }}</span>
+                    </div>
+
+                  <ul class="section-list">
+                    <li *ngFor="let section of agent.sections">
+                      <button type="button" class="section-link"
+                        [attr.aria-label]="'Afficher les applications de ' + section.nomSection"
+                        (click)="ouvrirApplications(section, agent)">
+                        <span class="section-folder" aria-hidden="true"></span>
+                        <span class="section-name">{{ section.nomSection }} <small>({{ section.section
+                            }})</small></span>
+                        <i class="now-ui-icons arrows-1_minimal-right" aria-hidden="true"></i>
+                      </button>
+                    </li>
+                  </ul>
+                </article>
+              </div>
+              </section>
+
+              <aside class="results-sidebar" aria-label="Résumé et consignes">
+                <section class="sidebar-panel summary-panel">
+                  <h2 class="sidebar-title"><span class="sidebar-title-mark">i</span>Résumé</h2>
+                  <dl class="summary-list">
+                    <div>
+                      <dt>Service</dt>
+                      <dd>{{ libelleServiceSelectionne }}</dd>
+                    </div>
+                    <ng-container *ngIf="!chargementDetails && !erreurDetails">
+                      <div>
+                        <dt>Agents</dt>
+                        <dd>{{ agentsAffiches.length }}</dd>
+                      </div>
+                      <div>
+                        <dt>Sections</dt>
+                        <dd>{{ nombreSections }}</dd>
+                      </div>
+                      <div>
+                        <dt>Applications rattachées</dt>
+                        <dd>{{ nombreApplications }}</dd>
+                      </div>
+                    </ng-container>
+                    <div *ngIf="chargementDetails">
+                      <dt>Données</dt>
+                      <dd>Chargement...</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section class="sidebar-panel instructions-panel">
+                  <h2 class="sidebar-title"><span class="sidebar-title-mark">?</span>Consignes</h2>
+                  <ol class="instruction-list">
+                    <li>Choisissez un service dans les filtres.</li>
+                    <li>Cliquez sur <strong>Rechercher</strong> pour afficher ses agents.</li>
+                    <li>Cliquez sur une section pour consulter ses applications.</li>
+                    <li>Indiquer le besoin du service : Conserver / Modifier / Supprimer.</li>
+                    <li>Modifiez les champs nécessaires, puis enregistrez la section.</li>
+                  </ol>
+                </section>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div *ngIf="sectionSelectionnee" class="applications-backdrop" (click)="fermerApplications()">
+    <section class="applications-modal" role="dialog" aria-modal="true" aria-labelledby="applicationsTitle"
+      (click)="$event.stopPropagation()">
+      <header class="modal-heading">
+        <div>
+          <p class="modal-kicker">{{ agentSelectionne?.matricule }} · {{ agentSelectionne?.nom }} {{
+            agentSelectionne?.prenoms }}</p>
+          <h2 id="applicationsTitle">{{ sectionSelectionnee.nomSection }}</h2>
+          <p class="modal-subtitle">Fonction : {{ agentSelectionne?.libelleFonction }}</p>
+        </div>
+        <button type="button" class="modal-close" aria-label="Fermer" (click)="fermerApplications()">
+          <i class="now-ui-icons ui-1_simple-remove"></i>
+        </button>
+      </header>
+
+      <div *ngIf="sectionSelectionnee.applications.length === 0" class="modal-empty">
+        Aucune application pour cette section.
+      </div>
+
+      <div *ngIf="messageEnregistrement" class="save-message save-success" role="status">{{ messageEnregistrement }}
+      </div>
+      <div *ngIf="erreurEnregistrement" class="save-message save-error" role="alert">{{ erreurEnregistrement }}</div>
+      <div *ngIf="chargementBesoinsService" class="save-message">Chargement des besoins de service...</div>
+      <div *ngIf="erreurBesoinsService" class="save-message save-error" role="alert">{{ erreurBesoinsService }}</div>
+
+      <div *ngIf="sectionSelectionnee.applications.length > 0" class="table-responsive modal-table-wrap">
+        <table class="table applications-table">
+          <thead>
+            <tr>
+              <th>Application</th>
+              <th>Catégorie</th>
+              <th>Type catégorie</th>
+              <th>Besoin service</th>
+              <th>Motif suppression</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let application of sectionSelectionnee.applications">
+              <td class="application-name">{{ application.nomApplication }}</td>
+              <td><input class="form-control" type="text" aria-label="Catégorie" [(ngModel)]="application.categorie"
+                  (ngModelChange)="sauvegarderBrouillon()"></td>
+              <td><input class="form-control" type="text" aria-label="Type catégorie"
+                  [(ngModel)]="application.typeCategorie" (ngModelChange)="sauvegarderBrouillon()"></td>
+              <td>
+                <select class="form-control" aria-label="Besoin service" [disabled]="chargementBesoinsService"
+                  [(ngModel)]="application.idBesoinService" (ngModelChange)="sauvegarderBrouillon()">
+                  <option [ngValue]="null">Choisir...</option>
+                  <option *ngFor="let besoin of besoinsService" [ngValue]="besoin.idBesoinService">
+                    {{ besoin.libelle }}
+                  </option>
+                </select>
+              </td>
+              <td><input class="form-control" type="text" aria-label="Motif suppression"
+                  [(ngModel)]="application.motifSuppression" (ngModelChange)="sauvegarderBrouillon()"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="modal-footer">
+        <button type="button" class="cancel-button" (click)="fermerApplications()">Fermer</button>
+        <button type="button" class="save-button"
+          [disabled]="enregistrementEnCours || sectionSelectionnee.applications.length === 0"
+          (click)="enregistrerApplications()">
+          {{ enregistrementEnCours ? 'Enregistrement...' : 'Enregistrer la section' }}
+        </button>
+      </footer>
+    </section>
+  </div>
+</ng-container>

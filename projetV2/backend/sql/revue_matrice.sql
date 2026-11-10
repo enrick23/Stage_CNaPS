@@ -1,0 +1,77 @@
+-- =====================================================================
+-- TABLE : REVUE_MATRICE
+-- RÔLE : Matrice formelle de revue des habilitations applicatives (DPS)
+--        Intègre le cycle : Revue -> Décision -> Contrôle -> Validation Audit -> Exécution.
+-- =====================================================================
+
+CREATE TABLE IAM.REVUE_MATRICE (
+    ID_REVUE_MATRICE        VARCHAR2(20) PRIMARY KEY,
+    CODE_DIRECTION          VARCHAR2(20),
+    CODE_SERVICE            VARCHAR2(8) NOT NULL,
+    CODE_FONCTION           VARCHAR2(10) NOT NULL,
+    SECTION                 VARCHAR2(20) NOT NULL,
+    APPLICATION             VARCHAR2(50) NOT NULL,
+    
+    -- Cible & Normalisation
+    SERVICE_CIBLE           VARCHAR2(8),
+    FONCTION_CIBLE          VARCHAR2(10),
+    FONCTIONNEMENT          VARCHAR2(1000),
+    
+    -- Arbitrage Métier (Chef de Service)
+    DECISION_REVUE          VARCHAR2(50),  -- 'À RETENIR', 'À SUPPRIMER', 'DÉDIÉE AU SERVICE', 'À ANALYSER'
+    NIVEAU_ACCES            VARCHAR2(50),  -- 'Consultation', 'Saisie', 'Validation', 'Administration'
+    ACTION_MOUVEMENT        VARCHAR2(50),  -- 'Maintien', 'Suppression', 'Ajout', 'Transfert', 'Réaffectation'
+    REGLE_HABILITATION      VARCHAR2(500),
+    
+    -- Contrôle automatisé & Conformité
+    CONTROLE_AUTO           VARCHAR2(100) DEFAULT 'À VÉRIFIER', -- 'CONFORME', 'À COMPLÉTER', 'À VÉRIFIER'
+    CONFORMITE              VARCHAR2(50)  DEFAULT 'À VÉRIFIER', -- 'CONFORME', 'À VÉRIFIER'
+    
+    -- Validation Auditeur Informatique
+    VALIDATION_AUDIT        VARCHAR2(50)  DEFAULT 'En attente', -- 'En attente', 'Validée', 'Rejetée', 'À corriger'
+    AUDITEUR_INFO           VARCHAR2(100),
+    DATE_VALIDATION_AUDIT   TIMESTAMP(6),
+    AVIS_AUDIT              VARCHAR2(1000),
+    
+    -- Exécution & Traçabilité
+    AUTORISATION_EXECUTION  VARCHAR2(20)  DEFAULT 'NON',        -- 'OUI', 'NON'
+    DATE_EXECUTION          TIMESTAMP(6),
+    EXECUTE_PAR             VARCHAR2(100),
+    STATUT_EXECUTION        VARCHAR2(50)  DEFAULT 'BLOQUÉE',    -- 'AUCUNE ACTION', 'À EXÉCUTER', 'EXÉCUTÉE', 'BLOQUÉE'
+    OBSERVATION             VARCHAR2(1000),
+    
+    DATE_CREATION           TIMESTAMP(6) DEFAULT SYSDATE,
+    DATE_MODIFICATION       TIMESTAMP(6) DEFAULT SYSDATE
+);
+
+CREATE SEQUENCE IAM.SEQ_REVUE_MATRICE START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
+
+CREATE OR REPLACE TRIGGER IAM.TRG_REVUE_MATRICE_BI
+BEFORE INSERT ON IAM.REVUE_MATRICE
+FOR EACH ROW
+BEGIN
+    IF :NEW.ID_REVUE_MATRICE IS NULL THEN
+        :NEW.ID_REVUE_MATRICE := 'RVM' || LPAD(IAM.SEQ_REVUE_MATRICE.NEXTVAL, 6, '0');
+    END IF;
+    IF :NEW.DATE_CREATION IS NULL THEN
+        :NEW.DATE_CREATION := SYSDATE;
+    END IF;
+    :NEW.DATE_MODIFICATION := SYSDATE;
+END;
+/
+
+CREATE OR REPLACE TRIGGER IAM.TRG_REVUE_MATRICE_BU
+BEFORE UPDATE ON IAM.REVUE_MATRICE
+FOR EACH ROW
+BEGIN
+    :NEW.DATE_MODIFICATION := SYSDATE;
+END;
+/
+
+CREATE INDEX IDX_RVM_SERVICE_FONCTION ON IAM.REVUE_MATRICE (CODE_SERVICE, CODE_FONCTION);
+CREATE INDEX IDX_RVM_APPLICATION      ON IAM.REVUE_MATRICE (APPLICATION);
+CREATE INDEX IDX_RVM_STATUT_AUDIT     ON IAM.REVUE_MATRICE (VALIDATION_AUDIT);
+CREATE INDEX IDX_RVM_STATUT_EXEC      ON IAM.REVUE_MATRICE (STATUT_EXECUTION);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON IAM.REVUE_MATRICE TO DEV_DEPL;
+

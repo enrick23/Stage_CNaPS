@@ -1,0 +1,77 @@
+<div class="conteneur">
+  <h1>🔍 Détail d'une application</h1>
+
+  <!-- Barre de recherche -->
+  <div class="barre-recherche">
+    <label for="menuCode">Code application :</label>
+    <input
+      id="menuCode"
+      type="text"
+      placeholder="Ex : CIT00, TA004, MRCT1..."
+      [(ngModel)]="menuCode"
+      (keyup.enter)="charger(menuCode)">
+    <button (click)="charger(menuCode)">🔎 Rechercher</button>
+  </div>
+
+  <p *ngIf="chargement" class="info">Chargement...</p>
+  <p *ngIf="erreur" class="erreur">{{ erreur }}</p>
+
+  <div *ngIf="!chargement && application">
+
+    <h2>Application : {{ application.nomApplication }} ({{ application.menuCode }})</h2>
+
+    <div class="bloc">
+      <h3>🏢 Services qui utilisent cette application</h3>
+
+      <p *ngIf="application.services.length === 0">
+        Aucun service n'utilise cette application.
+      </p>
+
+      <table *ngIf="application.services.length > 0" border="1">
+        <thead>
+          <tr>
+            <th>Code Service</th>
+            <th>Nom Service</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let s of application.services">
+            <td>{{ s.codeService }}</td>
+            <td>{{ s.nomService }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 2 : Observations -->
+    <div class="bloc">
+      <h3>📝 Observations serveur</h3>
+
+      <p *ngIf="application.observations.length === 0">
+        Aucune observation pour cette application.
+      </p>
+
+      <table *ngIf="application.observations.length > 0" border="1">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Service</th>
+            <th>Section</th>
+            <th>Observation</th>
+            
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let o of application.observations">
+            <td>{{ o.dateObservation | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ o.codeService }}</td>
+            <td>{{ o.section }}</td>
+            <td>{{ o.observation }}</td>
+            
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,362 @@
+<div class="main-content">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="container-fluid matrice-page">
+
+            <!-- En-tête -->
+            <header class="page-heading">
+              <div class="heading-mark"><i class="now-ui-icons education_paper"></i></div>
+              <div>
+                <p class="heading-kicker">GOUVERNANCE DES ACCÈS & AUDIT</p>
+                <h2>Matrice de Revue des Habilitations</h2>
+                <p class="heading-description">
+                  Cartographie, arbitrage métier, contrôle automatisé, validation par l'auditeur informatique et statut d'exécution.
+                </p>
+              </div>
+            </header>
+
+            <!-- Notification de succès -->
+            <div *ngIf="messageSucces" class="alert alert-success alert-dismissible fade show" role="alert">
+              <span>{{ messageSucces }}</span>
+            </div>
+
+            <!-- Filtres de sélection (Direction -> Service -> Fonction) -->
+            <section class="filter-panel" aria-label="Filtres de la revue">
+              <div class="filter-heading">
+                <div>
+                  <p class="heading-kicker">PÉRIMÈTRE DE LA REVUE</p>
+                  <h3>Filtres</h3>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group col-md-4">
+                  <label for="selectDirection">Direction</label>
+                  <select id="selectDirection" class="form-control" [(ngModel)]="directionChoisie"
+                    (ngModelChange)="quandDirectionChange()" [disabled]="enChargementDirections || listeDirections.length === 0">
+                    <option value="">Sélectionner une direction</option>
+                    <option *ngFor="let d of listeDirections" [value]="d.codeDirection">
+                      {{ d.libelleDirection }}
+                    </option>
+                  </select>
+                  <small *ngIf="enChargementDirections" class="form-text text-muted">Chargement des directions...</small>
+                  <div *ngIf="erreurDirections" class="text-danger small">{{ erreurDirections }}</div>
+                </div>
+
+                <div class="form-group col-md-4">
+                  <label for="selectService">Service</label>
+                  <select id="selectService" class="form-control" [(ngModel)]="serviceChoisi"
+                    (ngModelChange)="quandServiceChange()"
+                    [disabled]="!directionChoisie || enChargementServices || listeServices.length === 0">
+                    <option value="">Sélectionner un service</option>
+                    <option *ngFor="let s of listeServices" [value]="s.codeService">
+                      {{ s.libelleService }}
+                    </option>
+                  </select>
+                  <small *ngIf="enChargementServices" class="form-text text-muted">Chargement des services...</small>
+                  <div *ngIf="erreurServices" class="text-danger small">{{ erreurServices }}</div>
+                </div>
+
+                <div class="form-group col-md-4">
+                  <label for="selectFonction">Fonction</label>
+                  <select id="selectFonction" class="form-control" [(ngModel)]="fonctionChoisie"
+                    (ngModelChange)="quandFonctionChange()"
+                    [disabled]="!serviceChoisi || enChargementFonctions || listeFonctions.length === 0">
+                    <option value="">Sélectionner une fonction</option>
+                    <option *ngFor="let f of listeFonctions" [value]="f.codeFonction">
+                      {{ f.libelleFonction }}
+                    </option>
+                  </select>
+                  <small *ngIf="enChargementFonctions" class="form-text text-muted">Chargement des fonctions...</small>
+                  <div *ngIf="erreurFonctions" class="text-danger small">{{ erreurFonctions }}</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- États de chargement et erreurs -->
+            <div *ngIf="enChargementMatrice" class="status-message loading-message">
+              <span class="status-indicator"></span>Chargement de la matrice des habilitations...
+            </div>
+            <div *ngIf="erreurMatrice" class="status-message error-message">{{ erreurMatrice }}</div>
+
+            <!-- Tableau Matriciel -->
+            <section *ngIf="!enChargementMatrice && !erreurMatrice && lignesMatrice.length > 0" class="results-panel">
+              <div class="pivot-context" aria-label="Périmètre sélectionné">
+                <div class="pivot-field">
+                  <span>DIRECTION</span>
+                  <strong>{{ libelleDirectionChoisie }}</strong>
+                  <i class="now-ui-icons arrows-1_minimal-down" aria-hidden="true"></i>
+                </div>
+                <div class="pivot-field">
+                  <span>SERVICE</span>
+                  <strong>{{ libelleService(serviceChoisi) }}</strong>
+                </div>
+                <div class="pivot-field">
+                  <span>FONCTION_AGENT</span>
+                  <strong>{{ libelleFonction(fonctionChoisie) }}</strong>
+                </div>
+              </div>
+              <div class="results-heading d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <p class="heading-kicker">MATRICE CONSOLIDÉE</p>
+                  <h3>Lignes d'habilitation ({{ lignesFiltrees.length }})</h3>
+                </div>
+
+                <!-- Barre d'outils / Filtre rapide -->
+                <div class="toolbar d-flex align-items-center">
+                  <div class="excel-filter">
+                    <button type="button" class="excel-filter-trigger" [attr.aria-expanded]="filtreChampOuvert"
+                      (click)="ouvrirFiltreChamp()">
+                      <i class="now-ui-icons ui-2_funnel" aria-hidden="true"></i>
+                      <span>Filtrer par champ</span>
+                      <strong>{{ champFiltreSelectionne }}</strong>
+                      <i class="now-ui-icons arrows-1_minimal-down" aria-hidden="true"></i>
+                    </button>
+                    <div *ngIf="filtreChampOuvert" class="excel-filter-menu">
+                      <label for="champFiltre">Sélectionner le champ</label>
+                      <select id="champFiltre" class="form-control form-control-sm"
+                        [ngModel]="champFiltreSelectionne"
+                        (ngModelChange)="changerChampFiltre($event)">
+                        <option value="SERVICE">SERVICE</option>
+                        <option value="FONCTION_AGENT">FONCTION_AGENT</option>
+                        <option value="SECTION">SECTION</option>
+                        <option value="APPLICATION">APPLICATIONS</option>
+                      </select>
+                      <div class="excel-filter-search">
+                        <i class="now-ui-icons ui-1_zoom-bold" aria-hidden="true"></i>
+                        <input type="search" class="form-control form-control-sm" placeholder="Rechercher"
+                          [(ngModel)]="rechercheValeurFiltre">
+                      </div>
+                      <label class="excel-filter-option select-all-option">
+                        <input type="checkbox" [checked]="toutesValeursSelectionnees"
+                          (change)="basculerToutesValeursFiltre()">
+                        <span>(Sélectionner tout)</span>
+                      </label>
+                      <div class="excel-filter-values">
+                        <label *ngFor="let valeur of valeursFiltreAffichees" class="excel-filter-option">
+                          <input type="checkbox" [checked]="valeursTemporairesFiltre.indexOf(valeur) !== -1"
+                            (change)="basculerValeurFiltre(valeur)">
+                          <span>{{ valeur }}</span>
+                        </label>
+                        <p *ngIf="valeursFiltreAffichees.length === 0" class="filter-no-values">
+                          Aucune valeur trouvée.
+                        </p>
+                      </div>
+                      <div class="excel-filter-actions">
+                        <button type="button" class="clear-button" (click)="effacerFiltresColonnes()">Effacer filtre</button>
+                        <button type="button" class="search-button" (click)="appliquerFiltreChamp()">OK</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="filter-conformite">
+                    <select class="form-control form-control-sm" [(ngModel)]="filtreConformite">
+                      <option value="TOUS">Toutes les conformités</option>
+                      <option value="CONFORME">Conforme uniquement</option>
+                      <option value="À VÉRIFIER">À vérifier uniquement</option>
+                    </select>
+                  </div>
+                  <div class="search-box">
+                    <input type="text" class="form-control form-control-sm" placeholder="Rechercher une application..."
+                      [(ngModel)]="rechercheTexte">
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive matrice-table-wrap">
+                <table class="table matrice-table table-bordered">
+                  <thead>
+                    <tr>
+                      <th style="min-width: 170px;">Application / Section</th>
+                      <th style="min-width: 180px;">Fonctionnement</th>
+                      <th style="min-width: 150px;">Cibles (Service / Fonction)</th>
+                      <th style="min-width: 150px;">Décision & Accès</th>
+                      <th style="min-width: 130px;">Action</th>
+                      <th style="min-width: 120px;">Conformité</th>
+                      <th style="min-width: 150px;">Validation Audit</th>
+                      <th style="min-width: 130px;">Statut Exécution</th>
+                      <th style="min-width: 100px;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let l of lignesFiltrees">
+                      <!-- 1. Application & Section -->
+                      <td class="cell-app-sec">
+                        <strong>{{ l.nomApplication }}</strong>
+                        <div class="text-muted small">Code: {{ l.application }}</div>
+                        <span class="badge badge-secondary mt-1">{{ l.nomSection || l.section }}</span>
+                      </td>
+
+                      <!-- 2. Fonctionnement -->
+                      <td class="cell-fonctionnement">
+                        <textarea class="form-control form-control-sm" rows="2" [(ngModel)]="l.fonctionnement"
+                          placeholder="Description du rôle de l'application">
+                        </textarea>
+                      </td>
+
+                      <!-- 3. Cibles (Normalisation) -->
+                      <td class="cell-cibles">
+                        <label class="small text-muted mb-0">Service Cible :</label>
+                        <select class="form-control form-control-sm mb-1" [(ngModel)]="l.serviceCible">
+                          <option [value]="null">Non défini</option>
+                          <option *ngFor="let s of tousLesServices" [value]="s.codeService">
+                            {{ s.libelleService }}
+                          </option>
+                        </select>
+
+                        <label class="small text-muted mb-0">Fonction Cible :</label>
+                        <select class="form-control form-control-sm" [(ngModel)]="l.fonctionCible">
+                          <option [value]="null">Non définie</option>
+                          <option *ngFor="let f of toutesLesFonctions" [value]="f.codeFonction">
+                            {{ f.libelleFonction }}
+                          </option>
+                        </select>
+                      </td>
+
+                      <!-- 4. Décision & Niveau d'accès -->
+                      <td class="cell-decision">
+                        <label class="small text-muted mb-0">Décision :</label>
+                        <select class="form-control form-control-sm mb-1 font-weight-bold" [(ngModel)]="l.decisionRevue">
+                          <option [value]="null">À choisir...</option>
+                          <option *ngFor="let d of nomenclatures.decisions" [value]="d">{{ d }}</option>
+                        </select>
+
+                        <label class="small text-muted mb-0">Niveau d'accès :</label>
+                        <select class="form-control form-control-sm" [(ngModel)]="l.niveauAcces">
+                          <option [value]="null">À choisir...</option>
+                          <option *ngFor="let n of nomenclatures.niveauxAcces" [value]="n">{{ n }}</option>
+                        </select>
+                      </td>
+
+                      <!-- 5. Action / Mouvement -->
+                      <td class="cell-action">
+                        <select class="form-control form-control-sm mb-1" [(ngModel)]="l.actionMouvement">
+                          <option [value]="null">À choisir...</option>
+                          <option *ngFor="let a of nomenclatures.actionsMouvement" [value]="a">{{ a }}</option>
+                        </select>
+                        <input type="text" class="form-control form-control-sm" placeholder="Observation / Motif"
+                          [(ngModel)]="l.observation">
+                      </td>
+
+                      <!-- 6. Contrôle & Conformité -->
+                      <td class="cell-conformite text-center">
+                        <span class="badge" [ngClass]="{
+                            'badge-success': l.conformite === 'CONFORME',
+                            'badge-warning': l.conformite !== 'CONFORME'
+                          }">
+                          {{ l.conformite || 'À VÉRIFIER' }}
+                        </span>
+                        <div class="small text-muted mt-1" *ngIf="l.controleAuto">
+                          {{ l.controleAuto }}
+                        </div>
+                      </td>
+
+                      <!-- 7. Validation Auditeur Informatique -->
+                      <td class="cell-audit">
+                        <div class="d-flex align-items-center justify-content-between">
+                          <span class="badge" [ngClass]="{
+                              'badge-success': l.validationAudit === 'Validée',
+                              'badge-danger': l.validationAudit === 'Rejetée',
+                              'badge-warning': l.validationAudit === 'À corriger',
+                              'badge-info': l.validationAudit === 'En attente' || !l.validationAudit
+                            }">
+                            {{ l.validationAudit || 'En attente' }}
+                          </span>
+                          <button type="button" class="btn btn-outline-primary btn-sm btn-icon"
+                            title="Arbitrer l'audit informatique" (click)="ouvrirModaleAudit(l)">
+                            <i class="now-ui-icons ui-1_check"></i>
+                          </button>
+                        </div>
+                        <div *ngIf="l.avisAudit" class="small text-muted mt-1 italic">
+                          "{{ l.avisAudit }}"
+                        </div>
+                        <small *ngIf="l.dateValidationAudit" class="text-muted d-block">
+                          {{ l.dateValidationAudit | date:'dd/MM/yyyy' }}
+                        </small>
+                      </td>
+
+                      <!-- 8. Statut d'Exécution -->
+                      <td class="cell-statut-exec text-center">
+                        <span class="badge" [ngClass]="{
+                            'badge-danger': l.statutExecution === 'BLOQUÉE',
+                            'badge-primary': l.statutExecution === 'À EXÉCUTER',
+                            'badge-success': l.statutExecution === 'EXÉCUTÉE',
+                            'badge-light': l.statutExecution === 'AUCUNE ACTION' || !l.statutExecution
+                          }">
+                          {{ l.statutExecution || 'AUCUNE ACTION' }}
+                        </span>
+                        <small *ngIf="l.statutExecution === 'BLOQUÉE'" class="d-block text-danger mt-1">
+                          Attente validation audit
+                        </small>
+                      </td>
+
+                      <!-- 9. Actions -->
+                      <td class="cell-enregistrer text-center">
+                        <button type="button" class="btn btn-cnaps-save btn-sm" [disabled]="l.sauvegardeEnCours"
+                          (click)="enregistrerLigne(l)">
+                          <i class="now-ui-icons ui-1_check" *ngIf="!l.sauvegardeEnCours"></i>
+                          {{ l.sauvegardeEnCours ? '...' : 'Sauvegarder' }}
+                        </button>
+                        <div *ngIf="l.erreurLigne" class="text-danger small mt-1">
+                          {{ l.erreurLigne }}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Message état vide -->
+            <p *ngIf="fonctionChoisie && !enChargementMatrice && !erreurMatrice && lignesMatrice.length === 0"
+              class="empty-state">
+              <i class="now-ui-icons files_paper"></i>
+              <strong>Aucune habilitation trouvée</strong>
+              <span>Cette fonction ne possède pas encore d'application répertoriée dans le référentiel.</span>
+            </p>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modale d'approbation Auditeur Informatique -->
+<div *ngIf="ligneEnAudit" class="audit-modal-backdrop" (click)="fermerModaleAudit()">
+  <div class="audit-modal-dialog" (click)="$event.stopPropagation()">
+    <header class="modal-header">
+      <h5 class="modal-title">Validation Auditeur Informatique</h5>
+      <button type="button" class="close" (click)="fermerModaleAudit()">&times;</button>
+    </header>
+    <div class="modal-body">
+      <p><strong>Application :</strong> {{ ligneEnAudit.nomApplication }} ({{ ligneEnAudit.application }})</p>
+      <p><strong>Action demandée :</strong> {{ ligneEnAudit.actionMouvement || 'Maintien' }} - {{ ligneEnAudit.decisionRevue || 'Non définie' }}</p>
+
+      <div class="form-group">
+        <label for="validationSelect">Décision de l'Audit :</label>
+        <select id="validationSelect" class="form-control" [(ngModel)]="auditValidationChoisie">
+          <option *ngFor="let v of nomenclatures.validationsAudit" [value]="v">{{ v }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="avisAudit">Avis / Observation Audit :</label>
+        <textarea id="avisAudit" class="form-control" rows="3" [(ngModel)]="auditAvisSaisi"
+          placeholder="Justifier la validation ou le rejet..."></textarea>
+      </div>
+
+      <div *ngIf="erreurAudit" class="alert alert-danger small">
+        {{ erreurAudit }}
+      </div>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" (click)="fermerModaleAudit()">Annuler</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="auditEnCours"
+        (click)="confirmerValidationAudit()">
+        {{ auditEnCours ? 'Enregistrement...' : 'Confirmer la validation' }}
+      </button>
+    </footer>
+  </div>
+</div>
+

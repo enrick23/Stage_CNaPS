@@ -1,0 +1,53 @@
+,Tâches,Estimation,Date
+Préparation,Planification du projet avec feuille de route,2,21/09/2026-22/09/2026
+,Étude et analyse de l'existant,1,23/09/2026
+,"Installation des environnements et technologies (Java, Angular, Node, SQL Developer)",1,24/09/2026
+,Prise en main du projet,1,25/09/2026
+,Analyse du projet et des besoins,2,28/09/2026-29/09/2026
+,Rédaction du document technique du projet,2,30/09/2026-01/10/2026
+,Structuration et conception du modèle de données (MCD / MLD),2,02/10/2026 et 05/10/2026
+,Maquettes du design des pages,2,06/10/2026-07/10/2026
+,Sous Total,13,
+Développement,Consultation et exploration du dictionnaire de données,,
+,Création des tables et de la structure du dictionnaire de données Oracle,2,08/10/2026-09/10/2026
+,Filtre par application et recherche de tables ou vues (interface Angular),1,12/10/2026
+,Affichage de la fiche détaillée d'une application et de ses objets,1,13/10/2026
+,Catalogue des tables et vues avec affichage par schéma,2,14/10/2026-15/10/2026
+,"Consultation détaillée des colonnes (types, tailles, contraintes, sensibilité)",2,16/10/2026 et 19/10/2026
+,"Consultation des déclencheurs (triggers), séquences et index associés",2,20/10/2026-21/10/2026
+,Consultation des relations entre tables et du script SQL des vues,1,22/10/2026
+,Export Excel du dictionnaire de données au format CNaPS,2,23/10/2026 et 26/10/2026
+,Conception et gestion manuelle du dictionnaire,,
+,Formulaire de création d'un dictionnaire (sélection ou déclaration d'une application),3,27/10/2026-29/10/2026
+,Liste déroulante et recherche des schémas Oracle présents dans la base,2,30/10/2026 et 02/11/2026
+,Définition d'une table ou d'une vue et gestion des tables référentielles,1,03/11/2026
+,"Grille de saisie et de gestion des colonnes (ajout, modification, suppression)",1,04/11/2026
+,Gestion des niveaux de sensibilité et des contraintes des colonnes,1,05/11/2026
+,"Association des séquences, déclencheurs (triggers) et scripts de vues",1,06/11/2026
+,Modification et mise à jour d'un objet existant du dictionnaire,2,09/11/2026-10/11/2026
+,Contrôle de cohérence et validation des métadonnées saisies,3,11/11/2026-13/11/2026
+,Harmonisation visuelle de l'interface selon la charte graphique CNaPS,1,16/11/2026
+,Génération automatique par Intelligence Artificielle,,
+,Module de lecture et d'analyse du code source des applications,2,17/11/2026-18/11/2026
+,"Détection automatique des objets (tables, vues, colonnes, séquences, index, triggers)",2,19/11/2026-20/11/2026
+,Croisement automatique avec les métadonnées existantes de la base Oracle,1,23/11/2026
+,Intégration de l'IA pour générer les descriptions et le niveau de sensibilité,2,24/11/2026-25/11/2026
+,Pré-remplissage automatique et validation avant enregistrement dans le dictionnaire,1,26/11/2026
+,Suivi et indicateurs du dictionnaire,,
+,Compteur des applications et des schémas documentés,1,27/11/2026
+,"Compteur des tables, vues et tables référentielles",1,30/11/2026
+,Répartition des colonnes par niveau de sensibilité,1,01/12/2026
+,Synthèse de couverture du dictionnaire (applications existantes et nouvelles),2,02/12/2026-03/12/2026
+,Sous Total,41,
+Tests,Tests fonctionnels,2,04/12/2026 et 07/12/2026
+,Tests d'intégration,2,08/12/2026-09/12/2026
+,Corrections et amélioration,2,10/12/2026-11/12/2026
+,Présentation au niveau du SI,1,14/12/2026
+Déploiement après validation,Préparation de l'environnement de production,1,15/12/2026
+,Mise en production du module Dictionnaire de Données et de l'outil IA,1,16/12/2026
+Formation,Rédaction du manuel d'utilisation,2,17/12/2026-18/12/2026
+,Formation des utilisateurs,1,21/12/2026
+Gestion de projet,"Gestion de projet (suivi, réunions, reporting)",,Tout au long du projet
+,Total (jours),66,jours
+,,,
+,"Hypothèses : début le 21/09/2026, jours ouvrés (lun-ven) sans jours fériés. 66 jours ouvrés, sans marge. Estimations en bleu modifiables.",,

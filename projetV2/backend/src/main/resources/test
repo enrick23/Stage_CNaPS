@@ -1,0 +1,10 @@
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+spring.datasource.url=jdbc:oracle:thin:@//192.168.1.100:1521/m20
+spring.datasource.username=DEV_DEPL
+spring.datasource.password=DEV04
+
+
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+spring.datasource.url=jdbc:oracle:thin:@//localhost:1521/XE
+spring.datasource.username=DEV_DEPL
+spring.datasource.password=DEV04

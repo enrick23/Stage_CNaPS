@@ -1,0 +1,194 @@
+-- =====================================================================
+-- TABLE : BESOIN_SERVICE
+-- RÔLE : Valeurs disponibles pour le besoin de service.
+-- =====================================================================
+
+CREATE TABLE IAM.BESOIN_SERVICE (
+    ID_BESOIN_SERVICE NUMBER(2) PRIMARY KEY,
+    LIBELLE           VARCHAR2(20) NOT NULL UNIQUE
+);
+
+INSERT INTO IAM.BESOIN_SERVICE (ID_BESOIN_SERVICE, LIBELLE) VALUES (1, 'CONSERVER');
+INSERT INTO IAM.BESOIN_SERVICE (ID_BESOIN_SERVICE, LIBELLE) VALUES (2, 'MODIFIER');
+INSERT INTO IAM.BESOIN_SERVICE (ID_BESOIN_SERVICE, LIBELLE) VALUES (3, 'SUPPRIMER');
+
+-- =====================================================================
+-- TABLE : TYPE_ACTION
+-- RÔLE : Valeurs disponibles pour les actions d'historique.
+-- =====================================================================
+
+CREATE TABLE IAM.TYPE_ACTION (
+    ID_TYPE_ACTION NUMBER(2) PRIMARY KEY,
+    LIBELLE        VARCHAR2(20) NOT NULL UNIQUE
+);
+
+INSERT INTO IAM.TYPE_ACTION (ID_TYPE_ACTION, LIBELLE) VALUES (1, 'CREATION');
+INSERT INTO IAM.TYPE_ACTION (ID_TYPE_ACTION, LIBELLE) VALUES (2, 'MODIFICATION');
+INSERT INTO IAM.TYPE_ACTION (ID_TYPE_ACTION, LIBELLE) VALUES (3, 'SUPPRESSION');
+
+-- =====================================================================
+-- TABLE : RV_ACC
+-- RÔLE : État actuel des besoins d'accès des agents par service/section.
+--        Chaque ligne = 1 agent × 1 service × 1 section × 1 application.
+--        Les besoins peuvent être CONSERVER, MODIFIER ou SUPPRIMER.
+-- =====================================================================
+
+CREATE TABLE IAM.RV_ACC (
+    ID_ACC_DETAIL           VARCHAR2(20) PRIMARY KEY,
+    AGENT_MATRICULE         VARCHAR2(10) NOT NULL,
+    CODE_FONCTION           VARCHAR2(10) NOT NULL,
+    CODE_SERVICE            VARCHAR2(8) NOT NULL,
+    SECTION                 VARCHAR2(20) NOT NULL,
+    APPLICATION             VARCHAR2(50),
+    CATEGORIE               VARCHAR2(50),
+    TYPE_CATEGORIE          VARCHAR2(50),
+    ID_BESOIN_SERVICE       NUMBER(2),
+    MOTIF_SUPPRESSION       VARCHAR2(500),
+    DATE_ACTION             TIMESTAMP(6) DEFAULT SYSDATE,
+    CONSTRAINT FK_RV_ACC_BESOIN_SERVICE
+        FOREIGN KEY (ID_BESOIN_SERVICE)
+        REFERENCES IAM.BESOIN_SERVICE(ID_BESOIN_SERVICE)
+);
+
+CREATE SEQUENCE IAM.SEQ_RV_ACC START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
+
+CREATE OR REPLACE TRIGGER IAM.TRG_RV_ACC_BI
+BEFORE INSERT ON IAM.RV_ACC
+FOR EACH ROW
+BEGIN
+    IF :NEW.ID_ACC_DETAIL IS NULL THEN
+        :NEW.ID_ACC_DETAIL := 'ACC' || LPAD(SEQ_RV_ACC.NEXTVAL, 6, '0');
+    END IF;
+END;
+/
+
+CREATE INDEX IDX_RV_ACC_DETAIL_AGENT   ON IAM.RV_ACC (AGENT_MATRICULE);
+CREATE INDEX IDX_RV_ACC_DETAIL_SERVICE ON IAM.RV_ACC (CODE_SERVICE, SECTION);
+CREATE INDEX IDX_RV_ACC_DETAIL_BESOIN  ON IAM.RV_ACC (ID_BESOIN_SERVICE);
+
+
+
+-- =====================================================================
+-- TABLE : RV_ACC_HISTO
+-- RÔLE : Historique de toutes les actions sur RV_ACC.
+--        Chaque modification/ajout/suppression génère 1 ligne ici.
+--        Permet la traçabilité complète des décisions.
+-- =====================================================================
+
+CREATE TABLE IAM.RV_ACC_HISTO (
+    ID_ACC_HISTO            VARCHAR2(20) PRIMARY KEY,
+    ID_ACC_DETAIL           VARCHAR2(20) NOT NULL,
+    AGENT_MATRICULE         VARCHAR2(10) NOT NULL,
+    CODE_FONCTION           VARCHAR2(10) NOT NULL,
+    CODE_SERVICE            VARCHAR2(8) NOT NULL,
+    SECTION                 VARCHAR2(20) NOT NULL,
+    APPLICATION             VARCHAR2(50),
+    CATEGORIE               VARCHAR2(50),
+    TYPE_CATEGORIE          VARCHAR2(50),
+    ID_BESOIN_SERVICE       NUMBER(2),
+    MOTIF_SUPPRESSION       VARCHAR2(500),
+    DATE_ACTION             TIMESTAMP(6) DEFAULT SYSDATE,
+    ID_TYPE_ACTION          NUMBER(2),
+    CONSTRAINT FK_RV_ACC_HISTO
+        FOREIGN KEY (ID_ACC_DETAIL)
+        REFERENCES IAM.RV_ACC(ID_ACC_DETAIL),
+    CONSTRAINT FK_RV_ACC_HISTO_BESOIN_SERVICE
+        FOREIGN KEY (ID_BESOIN_SERVICE)
+        REFERENCES IAM.BESOIN_SERVICE(ID_BESOIN_SERVICE),
+    CONSTRAINT FK_RV_ACC_HISTO_TYPE_ACTION
+        FOREIGN KEY (ID_TYPE_ACTION)
+        REFERENCES IAM.TYPE_ACTION(ID_TYPE_ACTION)
+);
+
+CREATE SEQUENCE IAM.SEQ_RV_ACC_HISTO START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
+
+CREATE OR REPLACE TRIGGER IAM.TRG_RV_ACC_HISTO_BI
+BEFORE INSERT ON IAM.RV_ACC_HISTO
+FOR EACH ROW
+BEGIN
+    IF :NEW.ID_ACC_HISTO IS NULL THEN
+        :NEW.ID_ACC_HISTO := 'HACC' || LPAD(SEQ_RV_ACC_HISTO.NEXTVAL, 6, '0');
+    END IF;
+END;
+/
+
+CREATE INDEX IDX_RV_ACC_HISTO   ON IAM.RV_ACC_HISTO (ID_ACC_DETAIL);
+CREATE INDEX IDX_RV_ACC_HISTO_AGT    ON IAM.RV_ACC_HISTO (AGENT_MATRICULE);
+CREATE INDEX IDX_RV_ACC_HISTO_DATE     ON IAM.RV_ACC_HISTO (DATE_ACTION);
+CREATE INDEX IDX_RV_ACC_HISTO_TYPE     ON IAM.RV_ACC_HISTO (ID_TYPE_ACTION);
+CREATE INDEX IDX_RV_ACC_HISTO_BESOIN  ON IAM.RV_ACC_HISTO (ID_BESOIN_SERVICE);
+
+
+
+-- =====================================================================
+-- TABLE : MODIF_OBS_RV
+-- RÔLE : Observations faites côté serveur sur les applications.
+--        Permet de commenter une application utilisée par un service.
+--        Chaque ligne = 1 observation pour 1 (service, section, application).
+-- =====================================================================
+
+CREATE TABLE IAM.MODIF_OBS_RV (
+    ID_MODIF_OBS     VARCHAR2(20) PRIMARY KEY,
+    CODE_SERVICE     VARCHAR2(8),
+    SECTION          VARCHAR2(20),
+    APPLICATION      VARCHAR2(50),
+    OBSERVATION      VARCHAR2(500) NOT NULL,
+    DATE_OBSERVATION TIMESTAMP(6) DEFAULT SYSDATE,
+    SERVICE_PROPRIETE VARCHAR2(50) NOT NULL, -----le propriete de l application
+    FONCTIONNEMENT   VARCHAR2(50) NOT NULL   ------le role et fonctionnement
+);
+
+CREATE SEQUENCE IAM.SEQ_MODIF_OBS_RV START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
+
+CREATE OR REPLACE TRIGGER IAM.TRG_MODIF_OBS_RV_BI
+BEFORE INSERT ON IAM.MODIF_OBS_RV
+FOR EACH ROW
+BEGIN
+    IF :NEW.ID_MODIF_OBS IS NULL THEN
+        :NEW.ID_MODIF_OBS := 'OBS' || LPAD(SEQ_MODIF_OBS_RV.NEXTVAL, 6, '0');
+    END IF;
+END;
+/
+
+CREATE INDEX IDX_MODIF_OBS_APP        ON IAM.MODIF_OBS_RV (APPLICATION);
+CREATE INDEX IDX_MODIF_OBS_SERVICE    ON IAM.MODIF_OBS_RV (CODE_SERVICE);
+CREATE INDEX IDX_MODIF_OBS_DATE       ON IAM.MODIF_OBS_RV (DATE_OBSERVATION);
+
+
+
+
+-- =====================================================================
+-- TABLE : PARAM_PRIVILEGE
+-- RÔLE : Stocke la liste des codes fonctions ayant des privilèges élevés.
+-- =====================================================================
+
+CREATE TABLE IAM.PARAM_PRIVILEGE (
+    ID_PRIVILEGE    NUMBER(10) PRIMARY KEY,
+    CODE_FONCTION   VARCHAR2(10) NOT NULL UNIQUE,
+    DESCRIPTION     VARCHAR2(100)
+);
+
+CREATE SEQUENCE IAM.SEQ_PARAM_PRIVILEGE 
+START WITH 1 
+INCREMENT BY 1 
+NOCACHE 
+NOCYCLE;
+
+CREATE OR REPLACE TRIGGER IAM.TRG_PARAM_PRIVILEGE_BI
+BEFORE INSERT ON IAM.PARAM_PRIVILEGE
+FOR EACH ROW
+BEGIN
+    IF :NEW.ID_PRIVILEGE IS NULL THEN
+        :NEW.ID_PRIVILEGE := IAM.SEQ_PARAM_PRIVILEGE.NEXTVAL;
+    END IF;
+END;
+/
+
+INSERT INTO IAM.PARAM_PRIVILEGE (CODE_FONCTION, DESCRIPTION) 
+VALUES ('06A', 'Chef de Service');
+
+COMMIT;
+
+
+
+GRANT SELECT ON IAM.PARAM_PRIVILEGE TO DEV_DEPL;

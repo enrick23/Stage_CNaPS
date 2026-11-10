@@ -1,0 +1,776 @@
+<main class="dictionary-page">
+  <!-- EN-TÊTE PRINCIPAL & COMMUTATEUR DE MODE -->
+  <header class="page-heading">
+    <div>
+      <h1>Dictionnaire de données</h1>
+      <p class="intro">
+        Consultez les métadonnées existantes ou concevez le dictionnaire d'une nouvelle application.
+      </p>
+    </div>
+    <div class="heading-actions">
+      <!-- Bascule entre Consultation et Création -->
+      <div class="view-switcher">
+        <button
+          type="button"
+          class="switch-btn"
+          [class.active]="vueMode === 'consultation'"
+          (click)="changerVue('consultation')"
+        >
+          <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h10" />
+          </svg>
+          Consulter le dictionnaire
+        </button>
+        <button
+          type="button"
+          class="switch-btn primary"
+          [class.active]="vueMode === 'creation'"
+          (click)="changerVue('creation')"
+        >
+          <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nouveau dictionnaire
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NOTIFICATIONS ERREUR / SUCCES -->
+  <p class="notice error" *ngIf="erreur">{{ erreur }}</p>
+  <p class="notice success" *ngIf="succesMessage">{{ succesMessage }}</p>
+
+  <!-- ========================================================================= -->
+  <!-- VUE 1 : FORMULAIRE DE CRÉATION / SAISIE (FORMAT EXCEL DICO DE DONNÉES)     -->
+  <!-- ========================================================================= -->
+  <div *ngIf="vueMode === 'creation'" class="creation-container">
+    <form (ngSubmit)="enregistrerDictionnaire()" class="creation-form">
+      <!-- SECTION 1 : APPLICATION & SCHÉMA (Colonnes A & B du fichier Excel) -->
+      <div class="form-card">
+        <div class="card-title">
+          <span class="step-num">01</span>
+          <div>
+            <h3>Contexte de l'application &amp; Schéma Oracle</h3>
+            <p>Sélectionnez une application existante de Lucy ou créez-en une nouvelle.</p>
+          </div>
+        </div>
+
+        <div class="app-switch-row">
+          <label class="radio-label">
+            <input
+              type="radio"
+              name="appMode"
+              [value]="false"
+              [(ngModel)]="estNouvelleApplication"
+            />
+            <span>Application existante</span>
+          </label>
+          <label class="radio-label">
+            <input
+              type="radio"
+              name="appMode"
+              [value]="true"
+              [(ngModel)]="estNouvelleApplication"
+            />
+            <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>Créer / Déclarer une nouvelle application</span>
+          </label>
+        </div>
+
+        <!-- Cas 1 : Application existante -->
+        <div class="form-grid" *ngIf="!estNouvelleApplication">
+          <div class="form-field">
+            <label>Application cible :</label>
+            <select [(ngModel)]="formAppCode" name="formAppCode" class="form-input">
+              <option value=""> Sélectionner une application </option>
+              <option *ngFor="let a of applications" [value]="a.code">
+                {{ a.libelle }} ({{ a.code }})
+              </option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Schéma Oracle propriétaire :</label>
+            <ng-container *ngTemplateOutlet="selecteurSchema"></ng-container>
+          </div>
+        </div>
+
+        <!-- Cas 2 : Nouvelle application -->
+        <div class="form-grid-3" *ngIf="estNouvelleApplication">
+          <div class="form-field">
+            <label>Code de la nouvelle application :</label>
+            <input
+              type="text"
+              [(ngModel)]="formAppCode"
+              name="formNewAppCode"
+              placeholder="Ex: GEST_PRETS, SIG, RH_MOBILE..."
+              class="form-input"
+              required
+            />
+          </div>
+          <div class="form-field">
+            <label>Nom / Libellé de l'application :</label>
+            <input
+              type="text"
+              [(ngModel)]="formAppLibelle"
+              name="formAppLibelle"
+              placeholder="Ex: Gestion des Prêts et Avances"
+              class="form-input"
+            />
+          </div>
+          <div class="form-field">
+            <label>Schéma Oracle dédié :</label>
+            <ng-container *ngTemplateOutlet="selecteurSchema"></ng-container>
+          </div>
+          <div class="form-field col-span-3">
+            <label>Description fonctionnelle de l'application :</label>
+            <textarea
+              [(ngModel)]="formAppDescription"
+              name="formAppDescription"
+              rows="2"
+              class="form-input"
+              placeholder="Décrivez les objectifs et processus métiers gérés par cette nouvelle application..."
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- Template réutilisable du sélecteur de schéma avec recherche -->
+        <ng-template #selecteurSchema>
+          <div class="dico-select full-width" [class.is-open]="schemaDropdownOpen">
+            <button type="button" class="select-trigger" (click)="toggleSchemaDropdown($event)">
+              <span class="trigger-text">
+                {{ formSchema || 'Sélectionner un schéma...' }}
+              </span>
+              <svg class="select-caret" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            <div class="dico-dropdown" *ngIf="schemaDropdownOpen" (click)="$event.stopPropagation()">
+              <div class="dico-search">
+                <input
+                  type="text"
+                  [(ngModel)]="schemaSearchTerm"
+                  [ngModelOptions]="{ standalone: true }"
+                  placeholder="Rechercher un schéma dans la base..."
+                  autofocus
+                />
+              </div>
+              <ul class="dico-options">
+                <li
+                  *ngFor="let s of filteredSchemas"
+                  [class.active]="formSchema === s"
+                  (click)="choisirSchemaForm(s)"
+                >
+                  <strong>{{ s }}</strong>
+                </li>
+                <li
+                  *ngIf="schemaSearchTerm.trim() && !filteredSchemas.includes(schemaSearchTerm.trim().toUpperCase())"
+                  (click)="choisirSchemaForm(schemaSearchTerm.trim().toUpperCase())"
+                >
+                  <strong>{{ schemaSearchTerm.trim().toUpperCase() }}</strong>
+                  <small>Utiliser ce nouveau schéma</small>
+                </li>
+                <li class="no-match" *ngIf="filteredSchemas.length === 0 && !schemaSearchTerm.trim()">
+                  Aucun schéma trouvé.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- SECTION 2 : OBJET DE BASE (TABLE OU VUE) (Colonne C du fichier Excel) -->
+      <div class="form-card">
+        <div class="card-title">
+          <span class="step-num">02</span>
+          <div>
+            <h3>Définition de l'objet (Table ou Vue)</h3>
+            <p>Caractérisez l'objet physique et son rôle métier.</p>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Type de l'objet :</label>
+            <div class="radio-inline">
+              <label>
+                <input
+                  type="radio"
+                  name="formTypeObjet"
+                  value="TABLE"
+                  [(ngModel)]="formTypeObjet"
+                />
+                TABLE
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="formTypeObjet"
+                  value="VIEW"
+                  [(ngModel)]="formTypeObjet"
+                />
+                VUE
+              </label>
+              <label class="checkbox-label" *ngIf="formTypeObjet === 'TABLE'">
+                <input
+                  type="checkbox"
+                  name="formFlagRef"
+                  [(ngModel)]="formFlagRef"
+                />
+                <span>Table Référentielle (flag_ref)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label>Nom de l'objet (Table ou Vue) :</label>
+            <input
+              type="text"
+              [(ngModel)]="formNomObjet"
+              name="formNomObjet"
+              placeholder="Ex: SIG_DR, AGENT, PAIEMENT..."
+              class="form-input monospace"
+              required
+            />
+          </div>
+
+          <div class="form-field col-span-2">
+            <label>Description fonctionnelle globale de la table / vue :</label>
+            <textarea
+              [(ngModel)]="formTableDescription"
+              name="formTableDescription"
+              rows="2"
+              class="form-input"
+              placeholder="Ex: Contient les noms de chaque représentation avec codes respectifs et la répartition par zone..."
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3 : GRILLE DES COLONNES (Colonnes D à J, M, N de l'Excel) -->
+      <div class="form-card">
+        <div class="card-title-between">
+          <div class="card-title">
+            <span class="step-num">03</span>
+            <div>
+              <h3>Colonnes &amp; Attributs (Format Excel)</h3>
+              <p>Définissez chaque colonne avec son type, sa sensibilité, sa contrainte et sa description.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-add-col" (click)="ajouterColonne()">
+            <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>Ajouter une colonne</span>
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="grid-form-table">
+            <thead>
+              <tr>
+                <th style="width: 35px;">#</th>
+                <th style="min-width: 140px;">COLONNE *</th>
+                <th style="min-width: 110px;">TYPE</th>
+                <th style="min-width: 70px;">TAILLE</th>
+                <th style="min-width: 120px;">CONTRAINTE</th>
+                <th style="min-width: 130px;">SENSIBILITÉ</th>
+                <th style="min-width: 110px;">VALEUR DÉFAUT</th>
+                <th style="min-width: 220px;">DESCRIPTION DE LA COLONNE</th>
+                <th style="min-width: 110px;">NOM INDEXÉ</th>
+                <th style="min-width: 150px;">OBSERVATION</th>
+                <th style="width: 60px;">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let col of formColonnes; let idx = index">
+                <td class="text-center font-bold text-muted">{{ idx + 1 }}</td>
+                <!-- Colonne D : NOM -->
+                <td>
+                  <input
+                    type="text"
+                    [(ngModel)]="col.nom"
+                    name="col_nom_{{ idx }}"
+                    placeholder="DR_CODE"
+                    class="table-input monospace"
+                    required
+                  />
+                </td>
+                <!-- Colonne F : TYPE -->
+                <td>
+                  <select
+                    [(ngModel)]="col.typeBase"
+                    name="col_type_{{ idx }}"
+                    class="table-input"
+                  >
+                    <option *ngFor="let t of typesDisponibles" [value]="t">{{ t }}</option>
+                  </select>
+                </td>
+                <!-- Colonne G : TAILLE -->
+                <td>
+                  <input
+                    type="text"
+                    [(ngModel)]="col.taille"
+                    name="col_taille_{{ idx }}"
+                    placeholder="50"
+                    class="table-input"
+                  />
+                </td>
+                <!-- Colonne H : CONTRAINTE -->
+                <td>
+                  <select
+                    [(ngModel)]="col.contrainte"
+                    name="col_contrainte_{{ idx }}"
+                    class="table-input"
+                  >
+                    <option *ngFor="let c of contraintesDisponibles" [value]="c">
+                      {{ c || '— Aucune —' }}
+                    </option>
+                  </select>
+                </td>
+                <!-- Colonne E : SENSIBILITE -->
+                <td>
+                  <select
+                    [(ngModel)]="col.niveauSensibilite"
+                    name="col_sensib_{{ idx }}"
+                    class="table-input"
+                  >
+                    <option
+                      *ngFor="let s of niveauxSensibilite"
+                      [ngValue]="s.valeur"
+                    >
+                      {{ s.libelle }}
+                    </option>
+                  </select>
+                </td>
+                <!-- Colonne I : VALEUR PAR DEFAUT -->
+                <td>
+                  <input
+                    type="text"
+                    [(ngModel)]="col.defaut"
+                    name="col_defaut_{{ idx }}"
+                    placeholder="SYSDATE"
+                    class="table-input"
+                  />
+                </td>
+                <!-- Colonne J : DESCRIPTION -->
+                <td>
+                  <input
+                    type="text"
+                    [(ngModel)]="col.description"
+                    name="col_desc_{{ idx }}"
+                    placeholder="Description du champ..."
+                    class="table-input"
+                  />
+                </td>
+                <!-- Colonne M : NOM INDEXE -->
+                <td>
+                  <input
+                    type="text"
+                    [(ngModel)]="col.index"
+                    name="col_index_{{ idx }}"
+                    placeholder="IDX_..."
+                    class="table-input"
+                  />
+                </td>
+                <!-- Colonne N : OBSERVATION -->
+                <td>
+                  <input
+                    type="text"
+                    [(ngModel)]="col.observation"
+                    name="col_obs_{{ idx }}"
+                    placeholder="Remarques..."
+                    class="table-input"
+                  />
+                </td>
+                <!-- ACTIONS : SUPPRIMER -->
+                <td class="text-center">
+                  <button
+                    type="button"
+                    class="btn-row-del"
+                    (click)="supprimerColonne(idx)"
+                    [disabled]="formColonnes.length <= 1"
+                    title="Supprimer la colonne"
+                  >
+                    <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SECTION 4 : TRAITEMENTS, TRIGGERS & SÉQUENCES (Colonnes K, L de l'Excel) -->
+      <div class="form-card">
+        <div class="card-title">
+          <span class="step-num">04</span>
+          <div>
+            <h3>Séquences, Déclencheurs (Triggers) &amp; Code SQL</h3>
+            <p>Associez les automatismes et scripts de génération.</p>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <!-- Colonne K : SEQUENCE -->
+          <div class="form-field">
+            <label>Séquence(s) associée(s) :</label>
+            <input
+              type="text"
+              [(ngModel)]="formSequences"
+              name="formSequences"
+              placeholder="Ex: SIG.SEQ_SIG_DR"
+              class="form-input monospace"
+            />
+          </div>
+
+          <!-- Colonne L : TRIGGERS -->
+          <div class="form-field">
+            <label>Déclencheur(s) / Triggers &amp; Description :</label>
+            <textarea
+              [(ngModel)]="formTriggers"
+              name="formTriggers"
+              rows="2"
+              class="form-input"
+              placeholder="Ex: SIG.TRIG_SIG_DR : Déclencheur pour mise à jour automatique..."
+            ></textarea>
+          </div>
+
+          <!-- Si VUE : SCRIPT SQL -->
+          <div class="form-field col-span-2" *ngIf="formTypeObjet === 'VIEW'">
+            <label>Script de création de la vue (SQL) :</label>
+            <textarea
+              [(ngModel)]="formViewScript"
+              name="formViewScript"
+              rows="3"
+              class="form-input monospace"
+              placeholder="CREATE OR REPLACE VIEW ... AS SELECT ..."
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOUTONS D'ACTION DU FORMULAIRE -->
+      <div class="form-actions">
+        <button
+          type="button"
+          class="btn-secondary"
+          (click)="changerVue('consultation')"
+        >
+          Annuler
+        </button>
+        <button type="submit" class="btn-primary-save" [disabled]="enregistrementEnCours">
+          <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          <span>{{ enregistrementEnCours ? 'Enregistrement en cours…' : 'Enregistrer dans le dictionnaire' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- VUE 2 : MODE CONSULTATION EXISTANT DU DICTIONNAIRE                          -->
+  <!-- ========================================================================= -->
+  <ng-container *ngIf="vueMode === 'consultation'">
+    <!-- FILTRE PAR APPLICATION (IAM.DICO_DATA_TABLE) -->
+    <section class="filters">
+      <div class="filter-group">
+        <span class="filter-label">Application</span>
+        <div class="dico-select" [class.is-open]="appDropdownOpen">
+          <button type="button" class="select-trigger" (click)="toggleAppDropdown($event)">
+            <span class="trigger-text">
+              {{ selectedApp ? (selectedApp.libelle + ' (' + selectedApp.code + ')') : 'Toutes les applications' }}
+            </span>
+            <svg class="select-caret" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          <div class="dico-dropdown" *ngIf="appDropdownOpen" (click)="$event.stopPropagation()">
+            <div class="dico-search">
+              <input type="text" [(ngModel)]="appSearchTerm" placeholder="Rechercher une application..." autofocus />
+            </div>
+            <ul class="dico-options">
+              <li [class.active]="!selectedAppCode" (click)="choisirApplication('')">
+                <em>Toutes les applications</em>
+              </li>
+              <li *ngFor="let app of filteredApplications" [class.active]="selectedAppCode === app.code"
+                (click)="choisirApplication(app.code)">
+                <strong>{{ app.libelle }}</strong>
+                <small>{{ app.code }} · {{ app.description }}</small>
+              </li>
+              <li class="no-match" *ngIf="filteredApplications.length === 0">
+                Aucune application enregistrée dans DICO_DATA_TABLE.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FICHE APPLICATION -->
+    <section class="app-card" *ngIf="fiche">
+      <div class="app-card-main">
+        <p class="eyebrow">FICHE APPLICATION</p>
+        <h2>{{ fiche.application.libelle }} <code>{{ fiche.application.code }}</code></h2>
+        <p class="intro">{{ fiche.application.description || 'Aucune description renseignée.' }}</p>
+        <dl class="app-facts">
+          <div><dt>Code</dt><dd>{{ fiche.application.code }}</dd></div>
+          <div><dt>Objets rattachés</dt><dd>{{ objets.length }}</dd></div>
+          <div><dt>Source</dt><dd>IAM.DICO_DATA_*</dd></div>
+          <div><dt>Accès base</dt><dd>Confidentiel (jamais affiché)</dd></div>
+        </dl>
+      </div>
+      <div class="app-endpoints" *ngIf="fiche.sourceArchitectureRaccordee">
+        <table class="column-table">
+          <thead><tr><th>Couche</th><th>IP</th><th>Port</th><th>Contexte</th><th>Version</th><th>Protocole</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of fiche.frontends"><td>Frontend</td><td>{{ p.adresseIp }}</td><td>{{ p.port }}</td>
+              <td>{{ p.contextPath }}</td><td>{{ p.version }}</td><td>—</td></tr>
+            <tr *ngFor="let p of fiche.backends"><td>Backend</td><td>{{ p.adresseIp }}</td><td>{{ p.port }}</td>
+              <td>{{ p.contextPath }}</td><td>{{ p.version }}</td><td>{{ p.protocole }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CATALOGUE DES OBJETS -->
+    <section class="catalogue">
+      <aside class="catalogue-list">
+        <div class="list-heading">
+          <div>
+            <h2>Tables / Vues</h2><span>{{ filteredObjets.length }} / {{ objets.length }}</span>
+          </div>
+          <span class="schema-label">{{ selectedAppCode || 'TOUTES' }}</span>
+        </div>
+        <label class="search-box">
+          <svg class="search-ico" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input type="search" [(ngModel)]="searchTerm" placeholder="Ex : DRH.AGENT_DSI"
+            aria-label="Rechercher une table ou une vue" />
+        </label>
+        <p class="empty-list" *ngIf="chargementObjets">Chargement…</p>
+        <div class="table-list" *ngIf="!chargementObjets && filteredObjets.length; else noResults">
+          <button class="table-item" *ngFor="let o of filteredObjets" type="button"
+            [class.selected]="selectedObjet?.nom === o.nom && selectedObjet?.schema === o.schema"
+            (click)="selectObjet(o)">
+            <span class="table-copy">
+              <strong>{{ o.schema }}.{{ o.nom }}</strong>
+              <small>
+                {{ o.type === 'VIEW' ? 'Vue' : 'Table' }} · {{ o.nombreColonnes }} colonnes<ng-container *ngIf="!selectedAppCode && o.appCode"> · {{ o.appCode }}</ng-container>
+              </small>
+            </span>
+          </button>
+        </div>
+        <ng-template #noResults>
+          <p class="empty-list" *ngIf="!chargementObjets">
+            {{ selectedAppCode ? ('Aucun objet rattaché à ' + selectedAppCode + ' dans IAM.DICO_DATA_TABLE.') : 'Aucun objet enregistré dans IAM.DICO_DATA_TABLE.' }}
+          </p>
+        </ng-template>
+      </aside>
+
+      <article class="table-detail" *ngIf="selectedObjet; else selectPrompt">
+        <p class="empty-list" *ngIf="chargementDetail">Chargement de la structure…</p>
+        <ng-container *ngIf="detail">
+          <div class="detail-heading">
+            <div>
+              <div class="breadcrumb">
+                {{ detail.objet.appLibelle || selectedApp?.libelle || detail.objet.appCode || 'Dictionnaire' }}
+                <span>/</span> Schéma {{ detail.objet.schema }}
+                <span>/</span> {{ detail.objet.type === 'VIEW' ? 'Vue' : 'Table' }}
+              </div>
+              <h2>{{ detail.objet.schema }}.{{ detail.objet.nom }}</h2>
+              <p>{{ detail.objet.description || 'Aucune description renseignée.' }}</p>
+              <div class="table-facts">
+                <span *ngIf="detail.objet.referentiel" class="object-type">RÉFÉRENTIEL</span>
+                <span>Séquence :
+                  <code *ngIf="detail.sequences.length; else aucun">
+                    <ng-container *ngFor="let s of detail.sequences; let last = last">
+                      {{ s.nom }}{{ last ? '' : ', ' }}
+                    </ng-container>
+                  </code>
+                </span>
+                <span>Triggers : <strong>{{ detail.triggers.length }}</strong></span>
+                <span>Index : <strong>{{ detail.index.length }}</strong></span>
+              </div>
+              <ng-template #aucun><span class="muted">—</span></ng-template>
+            </div>
+            <div class="detail-actions">
+              <span class="object-type">{{ detail.objet.type }}</span>
+              <button type="button" class="btn-secondary small" (click)="editerObjetCourant()">
+                <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                <span>Compléter / Modifier</span>
+              </button>
+              <button type="button" class="btn-export small" (click)="exporter('objet')" [disabled]="exportEnCours">
+                <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Exporter (Excel)</span>
+              </button>
+            </div>
+          </div>
+
+          <nav class="tabs">
+            <button type="button" [class.active]="ongletDetail === 'colonnes'" (click)="ongletDetail = 'colonnes'">
+              Colonnes <small>{{ detail.colonnes.length }}</small>
+            </button>
+            <button type="button" [class.active]="ongletDetail === 'triggers'" (click)="ongletDetail = 'triggers'">
+              Triggers &amp; séquences <small>{{ detail.triggers.length + detail.sequences.length }}</small>
+            </button>
+            <button type="button" [class.active]="ongletDetail === 'index'" (click)="ongletDetail = 'index'">
+              Index <small>{{ detail.index.length }}</small>
+            </button>
+            <button type="button" [class.active]="ongletDetail === 'relations'" (click)="ongletDetail = 'relations'">
+              Relations <small>{{ detail.relationsSortantes.length + detail.relationsEntrantes.length }}</small>
+            </button>
+            <button type="button" *ngIf="detail.script" [class.active]="ongletDetail === 'script'"
+              (click)="ongletDetail = 'script'">
+              Script de la vue
+            </button>
+          </nav>
+
+          <!-- Colonnes : format du fichier DICO DE DONNÉES -->
+          <div class="column-table-wrap" *ngIf="ongletDetail === 'colonnes'">
+            <table class="column-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Colonne</th>
+                  <th title="DICO_DATA_COLUMN.niveau_sensibilite">Sensibilité</th>
+                  <th>Type</th>
+                  <th>Taille</th>
+                  <th>Contrainte</th>
+                  <th>Valeur par défaut</th>
+                  <th>Description</th>
+                  <th>Index</th>
+                  <th>Observation</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let c of detail.colonnes">
+                  <td>{{ c.position }}</td>
+                  <td class="column-name">{{ c.nom }}</td>
+                  <td>
+                    <span class="sens-badge" [ngClass]="classeSensibilite(c.niveauSensibilite)"
+                      [title]="c.niveauSensibilite == null ? 'À renseigner dans le dictionnaire' : ''">
+                      {{ c.niveauSensibilite ?? 'N/R' }}
+                    </span>
+                  </td>
+                  <td><code>{{ c.typeBase }}</code></td>
+                  <td>{{ c.taille || '—' }}</td>
+                  <td class="nowrap">
+                    <span *ngIf="c.clePrimaire" class="key-badge">PK</span>
+                    <span *ngIf="c.cleEtrangere" class="key-badge foreign" [title]="c.reference || ''">FK</span>
+                    <span *ngIf="c.cleUnique" class="key-badge unique">UK</span>
+                    <span *ngIf="!c.nullable && !c.clePrimaire" class="null-badge required">Not null</span>
+                    <span *ngIf="!c.clePrimaire && !c.cleEtrangere && !c.cleUnique && c.nullable" class="muted">—</span>
+                  </td>
+                  <td><code *ngIf="c.defaut; else tiret">{{ c.defaut }}</code></td>
+                  <td class="description-cell">
+                    {{ c.description || '—' }}
+                    <small *ngIf="c.reference" class="ref">→ {{ c.reference }}</small>
+                  </td>
+                  <td><code *ngIf="c.index.length; else tiret">{{ c.index.join(', ') }}</code></td>
+                  <td>{{ c.observation || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <ng-template #tiret><span class="muted">—</span></ng-template>
+          </div>
+
+          <!-- Triggers & séquences -->
+          <div *ngIf="ongletDetail === 'triggers'" class="panel">
+            <h3>Triggers</h3>
+            <table class="column-table" *ngIf="detail.triggers.length; else noTrig">
+              <thead><tr><th>Nom</th><th>Déclenchement</th><th>Événement</th><th>Statut</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let t of detail.triggers">
+                  <td class="column-name">{{ t.nom.includes('.') ? t.nom : (detail.objet.schema + '.' + t.nom) }}</td>
+                  <td>{{ t.type }}</td>
+                  <td>{{ t.evenement }}</td>
+                  <td><span class="null-badge" [class.required]="t.statut !== 'ENABLED'">{{ t.statut }}</span></td>
+                  <td class="description-cell"><code>{{ t.description }}</code></td>
+                </tr>
+              </tbody>
+            </table>
+            <ng-template #noTrig><p class="empty-list">Aucun trigger sur cet objet.</p></ng-template>
+
+            <h3>Séquences</h3>
+            <table class="column-table" *ngIf="detail.sequences.length; else noSeq">
+              <thead><tr><th>Séquence</th><th>Utilisée par</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let s of detail.sequences">
+                  <td class="column-name">{{ s.nom }}</td>
+                  <td>{{ s.origine.startsWith('TRIGGER:') ? 'Trigger ' + s.origine.substring(8) : 'Colonne IDENTITY ' + s.origine.substring(9) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <ng-template #noSeq><p class="empty-list">Aucune séquence liée par dépendance déclarée.</p></ng-template>
+          </div>
+
+          <!-- Index -->
+          <div *ngIf="ongletDetail === 'index'" class="panel">
+            <table class="column-table" *ngIf="detail.index.length; else noIdx">
+              <thead><tr><th>Nom de l'index</th><th>Unicité</th><th>Colonnes</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let ix of detail.index">
+                  <td class="column-name">{{ ix.nom }}</td>
+                  <td><span class="key-badge" [class.unique]="ix.unique">{{ ix.unique ? 'UNIQUE' : 'NON UNIQUE' }}</span></td>
+                  <td><code>{{ ix.colonnes.join(', ') }}</code></td>
+                </tr>
+              </tbody>
+            </table>
+            <ng-template #noIdx><p class="empty-list">Aucun index sur cet objet.</p></ng-template>
+          </div>
+
+          <!-- Relations déclarées -->
+          <div *ngIf="ongletDetail === 'relations'" class="panel">
+            <ul class="relations" *ngIf="detail.relationsSortantes.length || detail.relationsEntrantes.length; else noRel">
+              <li *ngFor="let r of detail.relationsSortantes">
+                <span class="key-badge foreign">→</span>
+                <code>{{ r.colonnes.join(', ') }}</code> référence
+                <a *ngIf="estConsultable(r.schemaReference); else horsPerimetre"
+                  (click)="ouvrirReference(r.schemaReference, r.tableReference)">
+                  {{ r.schemaReference }}.{{ r.tableReference }}</a>
+                <ng-template #horsPerimetre><span>{{ r.schemaReference }}.{{ r.tableReference }} (hors périmètre)</span></ng-template>
+                (<code>{{ r.colonnesReference.join(', ') }}</code>) <small>{{ r.contrainte }}</small>
+              </li>
+              <li *ngFor="let r of detail.relationsEntrantes">
+                <span class="key-badge">←</span>
+                <a *ngIf="estConsultable(r.schemaReference); else horsPerimetre2"
+                  (click)="ouvrirReference(r.schemaReference, r.tableReference)">
+                  {{ r.schemaReference }}.{{ r.tableReference }}</a>
+                <ng-template #horsPerimetre2><span>{{ r.schemaReference }}.{{ r.tableReference }} (hors périmètre)</span></ng-template>
+                (<code>{{ r.colonnesReference.join(', ') }}</code>) référence <code>{{ r.colonnes.join(', ') }}</code>
+                <small>{{ r.contrainte }}</small>
+              </li>
+            </ul>
+            <ng-template #noRel><p class="empty-list">Aucune contrainte de clé étrangère déclarée.</p></ng-template>
+          </div>
+
+          <!-- Script de vue -->
+          <div *ngIf="ongletDetail === 'script' && detail.script" class="panel">
+            <pre class="script">{{ detail.script }}</pre>
+          </div>
+        </ng-container>
+      </article>
+      <ng-template #selectPrompt>
+        <article class="table-detail select-prompt">Sélectionnez un objet pour consulter sa structure.</article>
+      </ng-template>
+    </section>
+  </ng-container>
+</main>
