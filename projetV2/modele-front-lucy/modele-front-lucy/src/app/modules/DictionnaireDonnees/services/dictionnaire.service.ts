@@ -116,7 +116,7 @@ export interface DicoFormulaireColonne {
 }
 
 export interface DicoFormulaireObjet {
-  appCode: string;
+  appCode?: string;
   appLibelle?: string;
   appDescription?: string;
   schema: string;
@@ -130,12 +130,89 @@ export interface DicoFormulaireObjet {
   colonnes: DicoFormulaireColonne[];
 }
 
+export interface DicoStatutIa {
+  fournisseur: string;
+  modele: string | null;
+  llmActif: boolean;
+  envoiCodeAutorise: boolean;
+}
+
+export interface DicoObjetPropose {
+  formulaire: DicoFormulaireObjet;
+  existeEnBase: boolean;
+  dejaDocumente: boolean;
+  sources: string[];
+  alertes: string[];
+  completude: number;
+  nombreColonnes: number;
+}
+
+export interface DicoAnalyseResultat {
+  appCode?: string;
+  appLibelle?: string;
+  appDescription?: string;
+  moteur: string;
+  fichiersAnalyses: number;
+  objets: DicoObjetPropose[];
+  avertissements: string[];
+  dureeMs: number;
+}
+
+export interface DicoAnalyseCodeRequete {
+  code: string;
+  nomFichier?: string;
+  appCode?: string;
+  appLibelle?: string;
+  appDescription?: string;
+  schemaDefaut?: string;
+}
+
+export interface DicoEnrichissementRequete {
+  schema: string;
+  nom: string;
+  appCode?: string;
+  appLibelle?: string;
+  appDescription?: string;
+}
+
 /** Accès aux endpoints de métadonnées et d'enregistrement dans IAM.DICO_DATA_*. */
 @Injectable({ providedIn: 'root' })
 export class DictionnaireService {
   private readonly apiUrl = `${environment.API_URL}/api/dictionnaire`;
 
   constructor(private http: HttpClient) {}
+
+  statutIa(): Observable<DicoStatutIa> {
+    return this.http.get<DicoStatutIa>(`${this.apiUrl}/ai/statut`);
+  }
+
+  analyserCode(req: DicoAnalyseCodeRequete): Observable<DicoAnalyseResultat> {
+    return this.http.post<DicoAnalyseResultat>(`${this.apiUrl}/ai/analyser-code`, req);
+  }
+
+  analyserFichiers(
+    fichiers: File[],
+    appCode?: string,
+    appLibelle?: string,
+    appDescription?: string,
+    schemaDefaut?: string
+  ): Observable<DicoAnalyseResultat> {
+    const formData = new FormData();
+    fichiers.forEach((f) => formData.append('fichiers', f, f.name));
+    if (appCode) formData.append('appCode', appCode);
+    if (appLibelle) formData.append('appLibelle', appLibelle);
+    if (appDescription) formData.append('appDescription', appDescription);
+    if (schemaDefaut) formData.append('schemaDefaut', schemaDefaut);
+    return this.http.post<DicoAnalyseResultat>(`${this.apiUrl}/ai/analyser-fichiers`, formData);
+  }
+
+  enrichirTableOracle(req: DicoEnrichissementRequete): Observable<DicoAnalyseResultat> {
+    return this.http.post<DicoAnalyseResultat>(`${this.apiUrl}/ai/enrichir-table-oracle`, req);
+  }
+
+  enregistrerLot(lot: DicoFormulaireObjet[]): Observable<DicoDetailObjet[]> {
+    return this.http.post<DicoDetailObjet[]>(`${this.apiUrl}/objets/lot`, lot);
+  }
 
   applications(): Observable<DicoApplication[]> {
     return this.http.get<DicoApplication[]>(`${this.apiUrl}/applications`);

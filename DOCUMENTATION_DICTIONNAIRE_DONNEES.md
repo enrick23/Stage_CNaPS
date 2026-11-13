@@ -27,12 +27,25 @@ flowchart LR
 
     subgraph Backend ["Backend Spring Boot (Port 8100)"]
         CTRL["DictionnaireController"]
+        AI_CTRL["DictionnaireAiController<br/>(/api/dictionnaire/ai/*)"]
+        AI_SVC["DictionnaireAiService<br/>(Orchestrateur IA)"]
+        ANALYZER["CodeAnalyzer<br/>(AST / Regex Java & SQL)"]
+        CATALOG["CatalogueOracle<br/>(ALL_TAB_COLUMNS, ALL_*)"]
+        EXPERT["MoteurExpert<br/>(Heuristique Métier CNaPS)"]
+        LLM["MoteurLlm<br/>(Gemini / Ollama / Groq)"]
         REPO["DictionnaireRepository"]
         XLS["DictionnaireExcelService<br/>(Apache POI)"]
+
         SVC --> CTRL
+        SVC --> AI_CTRL
         CTRL --> REPO
         CTRL --> XLS
-        XLS --> REPO
+        AI_CTRL --> AI_SVC
+        AI_CTRL --> REPO
+        AI_SVC --> ANALYZER
+        AI_SVC --> CATALOG
+        AI_SVC --> EXPERT
+        AI_SVC --> LLM
     end
 
     subgraph Oracle ["Base de données Oracle (Schéma IAM)"]
@@ -60,6 +73,13 @@ flowchart LR
 | `src/main/java/mg/cnaps/modele/dictionnaire/DictionnaireRepository.java` | Accès JDBC aux tables `IAM.DICO_DATA_*` (lecture des applications, tables/vues, colonnes, index, triggers, séquences et sauvegarde transactionnelle par `SELECT` / `INSERT` / `UPDATE`). |
 | `src/main/java/mg/cnaps/modele/dictionnaire/DictionnaireDTO.java` | Objets de transfert de données (`Application`, `FicheApplication`, `Objet`, `Colonne`, `Trigger`, `Index`, `Sequence`, `Relation`, `DetailObjet`, `FormulaireObjet`, `FormulaireColonne`). |
 | `src/main/java/mg/cnaps/modele/dictionnaire/DictionnaireExcelService.java` | Génération du fichier `.xlsx` à 14 colonnes avec cellules fusionnées par application et par table via Apache POI. |
+| `src/main/java/mg/cnaps/modele/dictionnaire/ia/DictionnaireAiController.java` | Contrôleur REST des endpoints IA : `/api/dictionnaire/ai/*` et persistance par lot `/api/dictionnaire/objets/lot`. |
+| `src/main/java/mg/cnaps/modele/dictionnaire/ia/DictionnaireAiService.java` | Service d'orchestration IA (analyse statique, croisement Oracle, enrichissement sémantique et respect des longueurs UTF-8 Oracle). |
+| `src/main/java/mg/cnaps/modele/dictionnaire/ia/CodeAnalyzer.java` | Analyseur statique (AST / Regex) de code source Java JPA (`@Entity`, `@Table`, `@Column`, `@Id`, `@SequenceGenerator`, `@ManyToOne`) et scripts SQL DDL/DML. |
+| `src/main/java/mg/cnaps/modele/dictionnaire/ia/CatalogueOracle.java` | Service de croisement technique avec le dictionnaire système Oracle (`ALL_TAB_COLUMNS`, `ALL_CONSTRAINTS`, `ALL_IND_COLUMNS`, `ALL_TRIGGERS`, `ALL_VIEWS`) sans `SELECT *`. |
+| `src/main/java/mg/cnaps/modele/dictionnaire/ia/MoteurExpert.java` | Moteur heuristique métier 100% hors-ligne (descriptions CNaPS, détection `FLAG_REF`, sensibilité 1 à 4, traduction de triggers). |
+| `src/main/java/mg/cnaps/modele/dictionnaire/ia/MoteurLlm.java` | Connecteur multi-fournisseurs LLM (Google Gemini, Ollama local, Groq/OpenAI compatible) avec repli automatique sur le moteur expert. |
+| `src/main/java/mg/cnaps/modele/dictionnaire/ia/IaModeles.java` | Modèles de données internes AST et DTOs d'échange REST pour le module IA. |
 | `sql/schema_dico_data.sql` | Script DDL Oracle de création des 6 tables `IAM.DICO_DATA_*`, des 6 séquences `IAM.SEQ_DICO_DATA_*` et des 6 triggers `IAM.TRG_DICO_DATA_*_BI`. |
 | `sql/local_iam_grants.sql` | Script optionnel contenant les `GRANT` vers `DEV_DEPL` (à exécuter uniquement par un DBA ou le propriétaire `IAM` en environnement local). |
 
@@ -210,6 +230,7 @@ Le formulaire de saisie et le service d'export (`DictionnaireExcelService`) resp
 
 ## 7. API REST (`/modele-api/api/dictionnaire`)
 
+### 7.1. Endpoints Métier Standards
 | Méthode | Endpoint | Description |
 | :---: | :--- | :--- |
 | `GET` | `/api/dictionnaire/applications` | Retourne la liste des applications déclarées dans `IAM.DICO_DATA_TABLE` avec le nombre d'objets et les schémas utilisés. |
@@ -219,9 +240,87 @@ Le formulaire de saisie et le service d'export (`DictionnaireExcelService`) resp
 | `POST` | `/api/dictionnaire/objets` | Crée ou met à jour une table/vue et l'ensemble de ses colonnes, index, triggers et script de vue dans `IAM.DICO_DATA_*`. |
 | `GET` | `/api/dictionnaire/schemas/{schema}/export?objet={nom}&application={code}` | Génère et télécharge le fichier Excel `.xlsx` au format officiel CNaPS. |
 
+### 7.2. Endpoints du Module IA
+| Méthode | Endpoint | Description |
+| :---: | :--- | :--- |
+| `GET` | `/api/dictionnaire/ai/statut` | Retourne l'état du moteur IA (fournisseur actif, modèle, connectivité base Oracle, schémas accessibles). |
+| `POST` | `/api/dictionnaire/ai/analyser-code` | Analyse un extrait de code source (Java JPA ou script SQL) envoyé sous forme texte, croise avec Oracle et génère les descriptions et sensibilités. |
+| `POST` | `/api/dictionnaire/ai/analyser-fichiers` | Upload et analyse unitaire ou multiple de fichiers (`.java`, `.sql`, archive `.zip`), extrait toutes les entités et tables détectées. |
+| `POST` | `/api/dictionnaire/ai/enrichir-table-oracle` | Rétro-ingénierie directe d'une table existante en base Oracle sans code source : inspecte le dictionnaire système et génère les métadonnées par IA. |
+| `POST` | `/api/dictionnaire/objets/lot` | Enregistrement par lot en une seule transaction de plusieurs objets analysés et validés dans `IAM.DICO_DATA_*` (sans `DELETE`). |
+
 ---
 
-## 8. Compilation, Exécution et Dépannage
+## 8. Module d'Intelligence Artificielle & Reverse Engineering
+
+### 8.1. Le Pipeline de Traitement en 5 Étapes
+
+```mermaid
+flowchart TD
+    subgraph S1["1. Saisie & Importation"]
+        F1["Upload multi-fichiers (.java, .sql, .zip)"]
+        F2["Collage direct de code (@Entity, DDL)"]
+        F3["Nom de table Oracle existante"]
+    end
+
+    subgraph S2["2. Analyse Statique & Rétro-ingénierie"]
+        CA["CodeAnalyzer (AST / Regex) :
+        • Classes JPA @Entity, @Table, @Column, @Id
+        • Relations @ManyToOne, @JoinColumn
+        • Séquences @SequenceGenerator
+        • Scripts SQL CREATE TABLE, VIEW, TRIGGER"]
+    end
+
+    subgraph S3["3. Croisement Catalogue Oracle"]
+        CO["CatalogueOracle (ALL_TAB_COLUMNS, ALL_CONSTRAINTS, ALL_TRIGGERS) :
+        • Ajustement exact des types physiques (VARCHAR2(36 BYTE), NUMBER...)
+        • Détection des index physiques et des déclencheurs actifs
+        • Garantie sécurité : AUCUNE donnée lue (Zéro SELECT *)"]
+    end
+
+    subgraph S4["4. Enrichissement Sémantique & Métier"]
+        SEM["MoteurLlm & MoteurExpert :
+        • Descriptions fonctionnelles en français
+        • Détection table de référence (FLAG_REF = Y/N)
+        • Classification sensibilité (Niveaux 1 à 4)
+        • Traduction en langage clair des déclencheurs PL/SQL"]
+    end
+
+    subgraph S5["5. Validation Humaine & Persistance"]
+        UI["Interface Angular Lucy (Pré-remplissage Human-in-the-Loop)"]
+        DB[("Tables IAM.DICO_DATA_* (Persistance par lot sécurisée DEV_DEPL)")]
+    end
+
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> UI
+    UI -->|Validation unitaire ou 'Tout enregistrer'| DB
+```
+
+### 8.2. Matrice de Sensibilité des Données (1 à 4)
+Le moteur IA (LLM et MoteurExpert de secours) attribue automatiquement le niveau de sensibilité à chaque colonne selon la nomenclature CNaPS :
+
+| Niveau | Libellé | Règles d'attribution & Critères CNaPS | Exemples |
+| :---: | :--- | :--- | :--- |
+| **1** | **Public** | Nomenclatures partagées, codes de référence, libellés non nominatifs, paramètres applicatifs globaux. | `CODE_TYPE`, `LIBELLE`, `FLAG_ACTIF`, `SIGLE_DIRECTION` |
+| **2** | **Interne** | Données de traçabilité et workflow interne, dates de traitement, statuts fonctionnels, identifiants techniques. | `DATE_DEMANDE`, `STATUT_VALIDATION`, `DATE_MODIF`, `UTILISATEUR_CREATION` |
+| **3** | **Confidentiel** | Données à caractère personnel des agents ou des affiliés CNaPS (identité, contact, traçabilité individuelle). | `MATRICULE_AGENT`, `NOM_PRENOM`, `CIN`, `NUMERO_AFFILIE`, `TELEPHONE`, `EMAIL` |
+| **4** | **Secret** | Données financières sensibles, montants de salaires ou prêts, coordonnées bancaires, empreintes de sécurité. | `MONTANT_DEMANDE`, `SALAIRE_BASE`, `RIB_BANCAIRE`, `NUM_COMPTE`, `HASH_PASSWORD` |
+
+### 8.3. Architecture Multi-Fournisseurs et Résilience Hors-Ligne
+Le module supporte nativement 4 modes d'exécution configurables dans `application.properties` :
+1. **`expert` (Par défaut / 100% Hors-Ligne)** : Moteur de règles heuristiques intégré qui génère immédiatement des descriptions professionnelles en français, les niveaux de sensibilité 1 à 4 et les règles de triggers sans aucun appel réseau.
+2. **`gemini`** : Connecteur vers l'API Google Gemini (`gemini-1.5-flash` ou `gemini-1.5-pro`) pour des analyses sémantiques poussées.
+3. **`ollama`** : Connexion vers une instance Ollama déployée sur le réseau local CNaPS (ex. `qwen2.5-coder:7b` ou `llama3:8b`).
+4. **`groq`** : Connecteur haute vitesse compatible OpenAI / Groq.
+
+> [!NOTE]
+> En cas d'indisponibilité du réseau ou de timeout sur une API distante, le système bascule automatiquement sur le `MoteurExpert` local de secours de manière totalement transparente pour l'utilisateur.
+
+---
+
+## 9. Compilation, Exécution et Dépannage
 
 ### Backend (Spring Boot / Java 11)
 ```powershell

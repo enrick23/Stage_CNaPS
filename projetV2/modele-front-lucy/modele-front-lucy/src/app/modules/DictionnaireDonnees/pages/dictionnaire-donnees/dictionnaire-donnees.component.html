@@ -33,6 +33,24 @@
           Nouveau dictionnaire
         </button>
       </div>
+
+      <!-- Bouton d'ouverture de l'Assistant IA -->
+      <button
+        type="button"
+        class="btn-trigger-ia-header"
+        (click)="ouvrirModalIa()"
+        title="Ouvrir l'Assistant IA de génération automatique et rétro-ingénierie"
+      >
+        <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <rect x="9" y="9" width="6" height="6" />
+          <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+          <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+          <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
+          <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
+        </svg>
+        <span>Assistant IA</span>
+      </button>
     </div>
   </header>
 
@@ -44,6 +62,43 @@
   <!-- VUE 1 : FORMULAIRE DE CRÉATION / SAISIE (FORMAT EXCEL DICO DE DONNÉES)     -->
   <!-- ========================================================================= -->
   <div *ngIf="vueMode === 'creation'" class="creation-container">
+
+    <!-- BANDEAU COMPACT DE DÉCLENCHEMENT DE L'ASSISTANT IA -->
+    <div class="ia-compact-callout">
+      <div class="callout-left">
+        <div class="callout-icon-box">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <rect x="9" y="9" width="6" height="6" />
+            <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+            <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+            <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
+            <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
+          </svg>
+        </div>
+        <div class="callout-text">
+          <div class="callout-header-row">
+            <strong>Assistant IA &bull; Rétro-ingénierie automatique</strong>
+            <span class="moteur-pill" *ngIf="statutIa">
+              {{ statutIa.fournisseur === 'expert' ? 'Moteur expert local (CNaPS)' : (statutIa.modele || statutIa.fournisseur) }}
+            </span>
+          </div>
+          <p>
+            Vous disposez d'entités Java JPA, de scripts SQL ou d'une table Oracle existante ? Pré-remplissez automatiquement ce formulaire grâce à l'analyseur IA.
+          </p>
+        </div>
+      </div>
+      <div class="callout-right">
+        <button type="button" class="btn-callout-ia" (click)="ouvrirModalIa()">
+          <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span>Générer par IA</span>
+        </button>
+      </div>
+    </div>
+
     <form (ngSubmit)="enregistrerDictionnaire()" class="creation-form">
       <!-- SECTION 1 : APPLICATION & SCHÉMA (Colonnes A & B du fichier Excel) -->
       <div class="form-card">
@@ -83,12 +138,39 @@
         <div class="form-grid" *ngIf="!estNouvelleApplication">
           <div class="form-field">
             <label>Application cible :</label>
-            <select [(ngModel)]="formAppCode" name="formAppCode" class="form-input">
-              <option value=""> Sélectionner une application </option>
-              <option *ngFor="let a of applications" [value]="a.code">
-                {{ a.libelle }} ({{ a.code }})
-              </option>
-            </select>
+            <div class="dico-select full-width" [class.is-open]="formAppDropdownOpen">
+              <button type="button" class="select-trigger" (click)="toggleFormAppDropdown($event)">
+                <span class="trigger-text">
+                  {{ applicationFormSelectionnee?.libelle || 'Sélectionner une application' }}
+                </span>
+                <svg class="select-caret" viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              <div class="dico-dropdown" *ngIf="formAppDropdownOpen" (click)="$event.stopPropagation()">
+                <div class="dico-search">
+                  <input
+                    type="text"
+                    [(ngModel)]="formAppSearchTerm"
+                    [ngModelOptions]="{ standalone: true }"
+                    placeholder="Rechercher une application..."
+                    autofocus
+                  />
+                </div>
+                <ul class="dico-options">
+                  <li *ngFor="let app of filteredFormApplications"
+                    [class.active]="formAppCode === app.code"
+                    (click)="choisirApplicationForm(app.code)">
+                    <strong>{{ app.libelle }}</strong>
+                    <small>{{ app.code }}</small>
+                  </li>
+                  <li class="no-match" *ngIf="filteredFormApplications.length === 0">
+                    Aucune application trouvée.
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
           <div class="form-field">
             <label>Schéma Oracle propriétaire :</label>
@@ -213,15 +295,15 @@
                 />
                 VUE
               </label>
-              <label class="checkbox-label" *ngIf="formTypeObjet === 'TABLE'">
-                <input
-                  type="checkbox"
-                  name="formFlagRef"
-                  [(ngModel)]="formFlagRef"
-                />
-                <span>Table Référentielle (flag_ref)</span>
-              </label>
             </div>
+            <label class="checkbox-label form-flag-ref" *ngIf="formTypeObjet === 'TABLE'">
+              <input
+                type="checkbox"
+                name="formFlagRef"
+                [(ngModel)]="formFlagRef"
+              />
+              <span>Table Référentielle (flag_ref)</span>
+            </label>
           </div>
 
           <div class="form-field">
@@ -486,7 +568,7 @@
         <div class="dico-select" [class.is-open]="appDropdownOpen">
           <button type="button" class="select-trigger" (click)="toggleAppDropdown($event)">
             <span class="trigger-text">
-              {{ selectedApp ? (selectedApp.libelle + ' (' + selectedApp.code + ')') : 'Toutes les applications' }}
+              {{ selectedApp ? selectedApp.libelle : 'Toutes les applications' }}
             </span>
             <svg class="select-caret" viewBox="0 0 24 24" aria-hidden="true">
               <polyline points="6 9 12 15 18 9" />
@@ -504,7 +586,7 @@
               <li *ngFor="let app of filteredApplications" [class.active]="selectedAppCode === app.code"
                 (click)="choisirApplication(app.code)">
                 <strong>{{ app.libelle }}</strong>
-                <small>{{ app.code }} · {{ app.description }}</small>
+                <small>{{ app.description }}</small>
               </li>
               <li class="no-match" *ngIf="filteredApplications.length === 0">
                 Aucune application enregistrée dans DICO_DATA_TABLE.
@@ -519,7 +601,7 @@
     <section class="app-card" *ngIf="fiche">
       <div class="app-card-main">
         <p class="eyebrow">FICHE APPLICATION</p>
-        <h2>{{ fiche.application.libelle }} <code>{{ fiche.application.code }}</code></h2>
+        <h2>{{ fiche.application.libelle }}</h2>
         <p class="intro">{{ fiche.application.description || 'Aucune description renseignée.' }}</p>
         <dl class="app-facts">
           <div><dt>Code</dt><dd>{{ fiche.application.code }}</dd></div>
@@ -545,10 +627,8 @@
     <section class="catalogue">
       <aside class="catalogue-list">
         <div class="list-heading">
-          <div>
-            <h2>Tables / Vues</h2><span>{{ filteredObjets.length }} / {{ objets.length }}</span>
-          </div>
-          <span class="schema-label">{{ selectedAppCode || 'TOUTES' }}</span>
+          <h2>Tables / Vues</h2>
+          <span>{{ filteredObjets.length }} / {{ objets.length }}</span>
         </div>
         <label class="search-box">
           <svg class="search-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -566,14 +646,14 @@
             <span class="table-copy">
               <strong>{{ o.schema }}.{{ o.nom }}</strong>
               <small>
-                {{ o.type === 'VIEW' ? 'Vue' : 'Table' }} · {{ o.nombreColonnes }} colonnes<ng-container *ngIf="!selectedAppCode && o.appCode"> · {{ o.appCode }}</ng-container>
+                {{ o.type === 'VIEW' ? 'Vue' : 'Table' }} · {{ o.nombreColonnes }} colonnes<ng-container *ngIf="!selectedAppCode && (o.appLibelle || o.appCode)"> · {{ o.appLibelle || o.appCode }}</ng-container>
               </small>
             </span>
           </button>
         </div>
         <ng-template #noResults>
           <p class="empty-list" *ngIf="!chargementObjets">
-            {{ selectedAppCode ? ('Aucun objet rattaché à ' + selectedAppCode + ' dans IAM.DICO_DATA_TABLE.') : 'Aucun objet enregistré dans IAM.DICO_DATA_TABLE.' }}
+            {{ selectedApp ? ('Aucun objet rattaché à « ' + selectedApp.libelle + ' » dans IAM.DICO_DATA_TABLE.') : 'Aucun objet enregistré dans IAM.DICO_DATA_TABLE.' }}
           </p>
         </ng-template>
       </aside>
@@ -773,4 +853,315 @@
       </ng-template>
     </section>
   </ng-container>
+
+  <!-- ========================================================================= -->
+  <!-- MODALE DÉDIÉE : ASSISTANT IA & RÉTRO-INGÉNIERIE DU DICTIONNAIRE          -->
+  <!-- ========================================================================= -->
+  <div class="ia-modal-backdrop" *ngIf="modalIaOuverte" (click)="fermerModalIa()">
+    <div class="ia-modal-dialog" (click)="$event.stopPropagation()">
+
+      <!-- En-tête de la modale -->
+      <div class="ia-modal-header">
+        <div class="ia-modal-title-group">
+          <div class="ia-modal-badge">
+            <svg class="badge-ico" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+              <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+              <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
+              <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
+            </svg>
+            <span>Module d'Intelligence Artificielle</span>
+          </div>
+          <h2>Génération automatique &amp; Rétro-ingénierie</h2>
+          <p class="ia-modal-subtitle">
+            Analysez des entités Java JPA, scripts SQL ou tables Oracle pour détecter automatiquement les objets,
+            générer les descriptions fonctionnelles et classifier la sensibilité des données.
+          </p>
+        </div>
+        <div class="ia-modal-header-actions">
+          <span class="moteur-pill" *ngIf="statutIa">
+            {{ statutIa.fournisseur === 'expert' ? 'Moteur expert local (CNaPS)' : (statutIa.modele || statutIa.fournisseur) }}
+          </span>
+          <button type="button" class="btn-close-modal" (click)="fermerModalIa()" title="Fermer la fenêtre">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Corps de la modale -->
+      <div class="ia-modal-body">
+
+        <!-- Onglets des modes d'entrée -->
+        <div class="ia-modal-tabs">
+          <button
+            type="button"
+            class="ia-modal-tab"
+            [class.active]="modeSaisieIa === 'fichiers'"
+            (click)="changerModeSaisieIa('fichiers')"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span>Fichiers source (.java, .sql, .zip)</span>
+          </button>
+          <button
+            type="button"
+            class="ia-modal-tab"
+            [class.active]="modeSaisieIa === 'code'"
+            (click)="changerModeSaisieIa('code')"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+            <span>Coller un extrait de code</span>
+          </button>
+          <button
+            type="button"
+            class="ia-modal-tab"
+            [class.active]="modeSaisieIa === 'oracle'"
+            (click)="changerModeSaisieIa('oracle')"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <ellipse cx="12" cy="5" rx="9" ry="3"/>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            <span>Table Oracle existante</span>
+          </button>
+        </div>
+
+        <!-- Mode 1 : Fichiers source -->
+        <div class="ia-mode-pane" *ngIf="modeSaisieIa === 'fichiers'">
+          <div
+            class="drop-zone"
+            [class.drag-over]="dragOver"
+            (dragover)="onDragOver($event)"
+            (dragleave)="onDragLeave($event)"
+            (drop)="onFichiersDrop($event)"
+            (click)="fileInput.click()"
+          >
+            <input
+              #fileInput
+              type="file"
+              multiple
+              (change)="onFichiersSelect($event)"
+              accept=".java,.sql,.pls,.pks,.pkb,.trg,.ddl,.txt,.zip"
+              style="display: none;"
+            />
+            <svg class="upload-ico" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p><strong>Glissez-déposez vos fichiers ici</strong> ou <span class="link-btn">parcourez vos dossiers</span></p>
+          </div>
+
+          <div class="file-chips" *ngIf="fichiersSelectionnes.length > 0">
+            <span class="file-chip" *ngFor="let f of fichiersSelectionnes; let i = index">
+              <span class="file-chip-name">{{ f.name }}</span>
+              <span class="file-chip-size">({{ (f.size / 1024).toFixed(1) }} Ko)</span>
+              <button type="button" class="btn-remove-chip" (click)="retirerFichier(i); $event.stopPropagation()" title="Retirer">✕</button>
+            </span>
+          </div>
+
+          <div class="ia-actions-bar">
+            <button
+              type="button"
+              class="btn-primary ia-run-btn"
+              [disabled]="chargementIa || fichiersSelectionnes.length === 0"
+              (click)="lancerAnalyseFichiers()"
+            >
+              <svg *ngIf="!chargementIa" class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span *ngIf="!chargementIa">Analyser {{ fichiersSelectionnes.length }} fichier(s)</span>
+              <span *ngIf="chargementIa" class="ia-loading-state">
+                <span class="spinner-inline"></span>
+                <span>Analyse et extraction en cours...</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode 2 : Coller du code -->
+        <div class="ia-mode-pane" *ngIf="modeSaisieIa === 'code'">
+          <div class="code-meta-row">
+            <div class="form-field inline-field">
+              <label>Nom du fichier d'origine :</label>
+              <input type="text" [(ngModel)]="nomFichierCode" [ngModelOptions]="{ standalone: true }" placeholder="Ex: DemandePret.java, schema.sql" class="form-input code-filename-input" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" (click)="chargerExempleCodeIa(); $event.stopPropagation()">
+              <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              <span>Charger un exemple Java JPA</span>
+            </button>
+          </div>
+          <div class="form-field">
+            <label>Code source Java JPA (@Entity, @Table) ou script SQL :</label>
+            <textarea
+              [(ngModel)]="codeSourceSaisi"
+              [ngModelOptions]="{ standalone: true }"
+              rows="8"
+              class="code-textarea"
+              placeholder="// Collez ici une classe Java JPA (@Entity, @Table, @Column, @ManyToOne...) ou un script SQL (CREATE TABLE, CREATE TRIGGER...)"
+            ></textarea>
+          </div>
+          <div class="ia-actions-bar">
+            <button
+              type="button"
+              class="btn-primary ia-run-btn"
+              [disabled]="chargementIa || !codeSourceSaisi.trim()"
+              (click)="lancerAnalyseCode()"
+            >
+              <svg *ngIf="!chargementIa" class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span *ngIf="!chargementIa">Analyser le code source</span>
+              <span *ngIf="chargementIa" class="ia-loading-state">
+                <span class="spinner-inline"></span>
+                <span>Analyse et extraction en cours...</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode 3 : Enrichir table Oracle -->
+        <div class="ia-mode-pane" *ngIf="modeSaisieIa === 'oracle'">
+          <div class="form-grid">
+            <div class="form-field">
+              <label>Schéma Oracle propriétaire :</label>
+              <input type="text" [(ngModel)]="enrichirSchemaOracle" [ngModelOptions]="{ standalone: true }" placeholder="Ex: DRH, TRESO, SIG, IAM" class="form-input" />
+            </div>
+            <div class="form-field">
+              <label>Nom de la table ou vue en base :</label>
+              <input type="text" [(ngModel)]="enrichirNomTableOracle" [ngModelOptions]="{ standalone: true }" placeholder="Ex: DEMANDE_PRET, REF_TYPE_PRET" class="form-input" />
+            </div>
+          </div>
+          <div class="ia-actions-bar">
+            <button
+              type="button"
+              class="btn-primary ia-run-btn"
+              [disabled]="chargementIa || !enrichirNomTableOracle.trim()"
+              (click)="lancerEnrichissementOracle()"
+            >
+              <svg *ngIf="!chargementIa" class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+              </svg>
+              <span *ngIf="!chargementIa">Interroger Oracle et enrichir par IA</span>
+              <span *ngIf="chargementIa" class="ia-loading-state">
+                <span class="spinner-inline"></span>
+                <span>Consultation et enrichissement en cours...</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- RÉSULTATS DE L'ANALYSE IA DANS LA MODALE -->
+        <div class="ia-results-block" *ngIf="analyseResultat">
+          <div class="results-header">
+            <div>
+              <h4>Objets détectés ({{ analyseResultat.objets.length }})</h4>
+              <p class="results-meta">
+                Moteur : <strong>{{ analyseResultat.moteur }}</strong> &bull; Durée : <strong>{{ analyseResultat.dureeMs }} ms</strong>
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn-primary btn-save-batch"
+              [disabled]="enregistrementLotEnCours || analyseResultat.objets.length === 0"
+              (click)="enregistrerToutLot()"
+            >
+              <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+              <span *ngIf="!enregistrementLotEnCours">Tout enregistrer directement ({{ analyseResultat.objets.length }})</span>
+              <span *ngIf="enregistrementLotEnCours" class="ia-loading-state">
+                <span class="spinner-inline"></span>
+                <span>Enregistrement en cours...</span>
+              </span>
+            </button>
+          </div>
+
+          <!-- Avertissements éventuels -->
+          <div class="ia-warnings" *ngIf="analyseResultat.avertissements.length > 0">
+            <ul>
+              <li *ngFor="let a of analyseResultat.avertissements">{{ a }}</li>
+            </ul>
+          </div>
+
+          <!-- Cartes des objets détectés -->
+          <div class="ia-objets-grid">
+            <div
+              class="ia-objet-card"
+              *ngFor="let p of analyseResultat.objets"
+              [class.is-selected]="objetSelectionneIa === p"
+            >
+              <div class="card-top-row">
+                <div class="obj-name">
+                  <span class="schema-tag">{{ p.formulaire.schema }}</span>
+                  <strong>{{ p.formulaire.nomObjet }}</strong>
+                </div>
+                <div class="badges-row">
+                  <span class="badge-type">{{ p.formulaire.typeObjet }}</span>
+                  <span class="badge-ref" *ngIf="p.formulaire.flagRef">RÉF</span>
+                  <span class="badge-db" *ngIf="p.existeEnBase">ORACLE OK</span>
+                  <span class="badge-doc" *ngIf="p.dejaDocumente">DOCUMENTÉ</span>
+                </div>
+              </div>
+
+              <p class="obj-desc">{{ p.formulaire.description || 'Aucune description générée.' }}</p>
+
+              <div class="obj-stats">
+                <span>{{ p.formulaire.colonnes.length }} colonne(s)</span>
+                <span *ngIf="p.formulaire.sequences">&bull; Séquence : {{ p.formulaire.sequences }}</span>
+                <div class="completude-bar-wrapper" [title]="'Complétude IA : ' + p.completude + '%'">
+                  <div class="completude-bar" [style.width.%]="p.completude"></div>
+                </div>
+              </div>
+
+              <div class="card-footer-action">
+                <button
+                  type="button"
+                  class="btn-load-obj"
+                  (click)="appliquerEtFermerModalIa(p)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  <span>Appliquer au formulaire &amp; Fermer</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Pied de la modale -->
+      <div class="ia-modal-footer">
+        <span class="footer-hint">
+          Les objets sélectionnés peuvent être vérifiés et complétés étape par étape dans le formulaire de saisie.
+        </span>
+        <button type="button" class="btn-secondary" (click)="fermerModalIa()">
+          Fermer
+        </button>
+      </div>
+
+    </div>
+  </div>
 </main>

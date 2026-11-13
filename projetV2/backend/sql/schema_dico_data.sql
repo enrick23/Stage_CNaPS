@@ -13,7 +13,7 @@ CREATE TABLE IAM.DICO_DATA_TABLE (
     DESCRIPTION         VARCHAR2(500 BYTE),
     FLAG_REF            CHAR(1 BYTE)        DEFAULT 'N',              -- 'Y' = Table référentielle, 'N' = Non
     SCHEMAS             VARCHAR2(30 BYTE)   NOT NULL,
-    APP_ID              VARCHAR2(30 BYTE),                            -- Lien vers CPT_MENU.MENU_CODE ou nouvelle app
+    APP_ID              VARCHAR2(36 BYTE),                            -- app_id (UUID) de l'application Lucy
     APP_LIBELLE         VARCHAR2(150 BYTE),                           -- Libellé si nouvelle application en conception
     SEQUENCE_ASSOCIEE   VARCHAR2(128 BYTE),                           -- Colonne K de l'Excel (ex: SIG.SEQ_SIG_DR)
     CONSTRAINT DICO_DATA_TABLE_PK PRIMARY KEY (TABLE_ID),

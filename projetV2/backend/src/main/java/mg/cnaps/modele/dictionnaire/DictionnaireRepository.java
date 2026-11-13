@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Accès aux métadonnées du dictionnaire :
@@ -56,9 +57,13 @@ public class DictionnaireRepository {
     public DetailObjet enregistrer(FormulaireObjet form) {
         String schema = form.schema.trim().toUpperCase(Locale.ROOT);
         String nomObjet = form.nomObjet.trim().toUpperCase(Locale.ROOT);
-        String appCode = form.appCode == null ? null : form.appCode.trim().toUpperCase(Locale.ROOT);
+        String appCode = form.appCode == null || form.appCode.trim().isEmpty()
+                ? null : form.appCode.trim().toUpperCase(Locale.ROOT);
         String appLibelle = form.appLibelle == null || form.appLibelle.trim().isEmpty()
                 ? null : form.appLibelle.trim();
+        if (appCode == null && appLibelle != null) {
+            appCode = genererCodeApplication(appLibelle);
+        }
         if (appLibelle == null && appCode != null) {
             Application appExistante = application(appCode);
             appLibelle = appExistante != null && appExistante.libelle != null ? appExistante.libelle : appCode;
@@ -216,10 +221,47 @@ public class DictionnaireRepository {
         return detail(schema, nomObjet);
     }
 
+    /**
+     * Enregistre un lot d'objets (tables/vues) dans IAM.DICO_DATA_* au sein d'une même transaction.
+     */
+    @Transactional(readOnly = false)
+    public List<DetailObjet> enregistrerLot(List<FormulaireObjet> formulaires) {
+        List<DetailObjet> resultats = new ArrayList<>();
+        if (formulaires == null || formulaires.isEmpty()) return resultats;
+        for (FormulaireObjet form : formulaires) {
+            if (form != null && form.schema != null && form.nomObjet != null) {
+                DetailObjet d = enregistrer(form);
+                if (d != null) resultats.add(d);
+            }
+        }
+        return resultats;
+    }
+
     private static String videNull(String s) {
         if (s == null) return null;
         String t = s.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    /**
+     * Génère l'identifiant APP_ID d'une nouvelle application.
+     * APP_ID correspond à app_id (UUID, PK, NOT NULL) du modèle de structure d'une application Lucy :
+     * on génère donc un UUID (36 caractères, ex. 3F2504E0-4F89-11D3-9A0C-0305E82C3301).
+     * Si une application portant déjà ce libellé existe dans le dictionnaire, son APP_ID est réutilisé.
+     */
+    private String genererCodeApplication(String libelle) {
+        String libNorm = libelle.trim().toUpperCase(Locale.ROOT);
+        try {
+            List<String> existantParLibelle = jdbc.query(
+                    "SELECT UPPER(TRIM(APP_ID)) FROM IAM.DICO_DATA_TABLE "
+                  + " WHERE UPPER(TRIM(APP_LIBELLE)) = ? AND APP_ID IS NOT NULL",
+                    (rs, i) -> rs.getString(1), libNorm);
+            if (!existantParLibelle.isEmpty()) {
+                return existantParLibelle.get(0);
+            }
+        } catch (DataAccessException ignored) { }
+
+        return UUID.randomUUID().toString().toUpperCase(Locale.ROOT);
     }
 
     // ------------------------------------------------------------------ Applications & Schémas (IAM.DICO_DATA_*)

@@ -1,11 +1,14 @@
 import { Component, ElementRef, HostListener, OnInit } from '@angular/core';
 import {
+  DicoAnalyseResultat,
   DicoApplication,
   DicoDetailObjet,
   DicoFicheApplication,
   DicoFormulaireColonne,
   DicoFormulaireObjet,
   DicoObjet,
+  DicoObjetPropose,
+  DicoStatutIa,
   DictionnaireService,
 } from '../../services/dictionnaire.service';
 
@@ -33,7 +36,9 @@ export class DictionnaireDonneesComponent implements OnInit {
   schemaSearchTerm = '';
 
   appDropdownOpen = false;
+  formAppDropdownOpen = false;
   schemaDropdownOpen = false;
+  formAppSearchTerm = '';
 
   fiche: DicoFicheApplication | null = null;
   ongletDetail: 'colonnes' | 'triggers' | 'index' | 'relations' | 'script' = 'colonnes';
@@ -44,6 +49,24 @@ export class DictionnaireDonneesComponent implements OnInit {
   chargementDetail = false;
   erreur: string | null = null;
   succesMessage: string | null = null;
+
+  // --- Module Assistant IA ---
+  statutIa: DicoStatutIa | null = null;
+  modalIaOuverte = false;
+  panneauIaOuvert = true;
+  modeSaisieIa: 'fichiers' | 'code' | 'oracle' = 'fichiers';
+  chargementIa = false;
+  enregistrementLotEnCours = false;
+  analyseResultat: DicoAnalyseResultat | null = null;
+  objetSelectionneIa: DicoObjetPropose | null = null;
+
+  codeSourceSaisi = '';
+  nomFichierCode = 'DemandePret.java';
+  fichiersSelectionnes: File[] = [];
+  dragOver = false;
+
+  enrichirSchemaOracle = '';
+  enrichirNomTableOracle = '';
 
   // --- Modèle du formulaire de création / conception ---
   estNouvelleApplication = false;
@@ -87,6 +110,7 @@ export class DictionnaireDonneesComponent implements OnInit {
 
   ngOnInit(): void {
     this.initialiserFormulaire();
+    this.chargerStatutIa();
     this.dico.applications().subscribe({
       next: (apps) => (this.applications = apps),
       error: () => (this.erreur = 'Impossible de charger les applications depuis IAM.DICO_DATA_*.'),
@@ -304,11 +328,13 @@ export class DictionnaireDonneesComponent implements OnInit {
       this.erreur = 'Veuillez renseigner le nom de la table ou de la vue.';
       return;
     }
-    const appFinale = this.estNouvelleApplication
-      ? this.formAppCode.trim()
-      : this.formAppCode;
-    if (!appFinale) {
-      this.erreur = 'Veuillez sélectionner ou renseigner un code d’application.';
+    if (this.estNouvelleApplication) {
+      if (!this.formAppLibelle.trim()) {
+        this.erreur = 'Veuillez renseigner le nom / libellé de la nouvelle application.';
+        return;
+      }
+    } else if (!this.formAppCode) {
+      this.erreur = 'Veuillez sélectionner une application cible.';
       return;
     }
     if (!this.formSchema.trim()) {
@@ -327,12 +353,14 @@ export class DictionnaireDonneesComponent implements OnInit {
     this.enregistrementEnCours = true;
 
     const appExistante = !this.estNouvelleApplication
-      ? this.applications.find((a) => a.code === appFinale.toUpperCase())
+      ? this.applications.find((a) => a.code === this.formAppCode.toUpperCase())
       : undefined;
 
     const payload: DicoFormulaireObjet = {
-      appCode: appFinale.toUpperCase(),
-      appLibelle: this.formAppLibelle.trim() || appExistante?.libelle || undefined,
+      appCode: this.estNouvelleApplication ? undefined : this.formAppCode.toUpperCase(),
+      appLibelle: this.estNouvelleApplication
+        ? this.formAppLibelle.trim()
+        : appExistante?.libelle || undefined,
       appDescription: this.formAppDescription.trim() || undefined,
       schema: this.formSchema.trim().toUpperCase(),
       nomObjet: this.formNomObjet.trim().toUpperCase(),
@@ -351,16 +379,20 @@ export class DictionnaireDonneesComponent implements OnInit {
     this.dico.enregistrer(payload).subscribe({
       next: (res) => {
         this.enregistrementEnCours = false;
-        this.selectedAppCode = payload.appCode;
+        const codeGenere = res.objet.appCode || payload.appCode || '';
+        this.selectedAppCode = codeGenere;
 
         this.dico.applications().subscribe((apps) => (this.applications = apps));
         this.dico.schemas().subscribe((s) => (this.schemas = s));
-        this.dico.fiche(payload.appCode).subscribe((f) => (this.fiche = f));
+        if (codeGenere) {
+          this.dico.fiche(codeGenere).subscribe((f) => (this.fiche = f));
+        }
 
         this.vueMode = 'consultation';
-        this.succesMessage = `L'objet « ${payload.schema}.${payload.nomObjet} » a été enregistré dans IAM.DICO_DATA_* pour l'application « ${payload.appCode} ».`;
+        const nomAppAffiche = res.objet.appLibelle || payload.appLibelle || codeGenere;
+        this.succesMessage = `L'objet « ${payload.schema}.${payload.nomObjet} » a été enregistré dans IAM.DICO_DATA_* pour l'application « ${nomAppAffiche} ».`;
 
-        this.dico.objets(payload.appCode).subscribe({
+        this.dico.objets(codeGenere || undefined).subscribe({
           next: (objets) => {
             this.objets = objets;
             this.selectedObjet = res.objet;
@@ -382,6 +414,7 @@ export class DictionnaireDonneesComponent implements OnInit {
   onDocumentClick(event: MouseEvent): void {
     if (!this.elementRef.nativeElement.contains(event.target)) {
       this.appDropdownOpen = false;
+      this.formAppDropdownOpen = false;
       this.schemaDropdownOpen = false;
     }
   }
@@ -400,6 +433,36 @@ export class DictionnaireDonneesComponent implements OnInit {
     }
     this.schemaDropdownOpen = !this.schemaDropdownOpen;
     this.appDropdownOpen = false;
+    this.formAppDropdownOpen = false;
+  }
+
+  toggleFormAppDropdown(event?: MouseEvent): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.formAppDropdownOpen = !this.formAppDropdownOpen;
+    this.appDropdownOpen = false;
+    this.schemaDropdownOpen = false;
+  }
+
+  choisirApplicationForm(appCode: string): void {
+    this.formAppCode = appCode;
+    this.formAppDropdownOpen = false;
+    this.formAppSearchTerm = '';
+  }
+
+  get applicationFormSelectionnee(): DicoApplication | undefined {
+    return this.applications.find((app) => app.code === this.formAppCode);
+  }
+
+  get filteredFormApplications(): DicoApplication[] {
+    const term = this.formAppSearchTerm.trim().toLocaleLowerCase();
+    if (!term) {
+      return this.applications;
+    }
+    return this.applications.filter((app) =>
+      `${app.libelle} ${app.code} ${app.description ?? ''}`.toLocaleLowerCase().includes(term)
+    );
   }
 
   choisirSchemaForm(schema: string): void {
@@ -455,6 +518,395 @@ export class DictionnaireDonneesComponent implements OnInit {
       });
     }
     this.chargerObjets();
+  }
+
+  // =========================================================================
+  // MÉTHODES DE L'ASSISTANT IA
+  // =========================================================================
+
+  chargerStatutIa(): void {
+    this.dico.statutIa().subscribe({
+      next: (s) => (this.statutIa = s),
+      error: () => {},
+    });
+  }
+
+  togglePanneauIa(): void {
+    this.panneauIaOuvert = !this.panneauIaOuvert;
+  }
+
+  ouvrirModalIa(): void {
+    this.modalIaOuverte = true;
+    this.erreur = null;
+  }
+
+  fermerModalIa(): void {
+    this.modalIaOuverte = false;
+  }
+
+  appliquerEtFermerModalIa(propose: DicoObjetPropose): void {
+    this.choisirObjetIa(propose);
+    this.modalIaOuverte = false;
+    this.succesMessage = `Structure de ${propose.formulaire.schema}.${propose.formulaire.nomObjet} appliquée au formulaire avec succès.`;
+  }
+
+  changerModeSaisieIa(mode: 'fichiers' | 'code' | 'oracle'): void {
+    this.modeSaisieIa = mode;
+    this.erreur = null;
+  }
+
+  onFichiersDrop(e: DragEvent): void {
+    e.preventDefault();
+    this.dragOver = false;
+    if (e.dataTransfer?.files) {
+      this.ajouterFichiers(Array.from(e.dataTransfer.files));
+    }
+  }
+
+  onDragOver(e: DragEvent): void {
+    e.preventDefault();
+    this.dragOver = true;
+  }
+
+  onDragLeave(e: DragEvent): void {
+    e.preventDefault();
+    this.dragOver = false;
+  }
+
+  onFichiersSelect(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    if (input.files) {
+      this.ajouterFichiers(Array.from(input.files));
+      input.value = '';
+    }
+  }
+
+  private ajouterFichiers(fichiers: File[]): void {
+    const valides = fichiers.filter((f) => {
+      const n = f.name.toLowerCase();
+      return (
+        n.endsWith('.java') ||
+        n.endsWith('.sql') ||
+        n.endsWith('.pls') ||
+        n.endsWith('.pks') ||
+        n.endsWith('.pkb') ||
+        n.endsWith('.trg') ||
+        n.endsWith('.ddl') ||
+        n.endsWith('.txt') ||
+        n.endsWith('.zip')
+      );
+    });
+    this.fichiersSelectionnes = [...this.fichiersSelectionnes, ...valides];
+  }
+
+  retirerFichier(index: number): void {
+    this.fichiersSelectionnes.splice(index, 1);
+  }
+
+  /** Charge un exemple réaliste de code Java JPA + SQL CNaPS dans l'éditeur IA. */
+  chargerExempleCodeIa(): void {
+    this.modeSaisieIa = 'code';
+    this.nomFichierCode = 'DemandePret.java';
+    if (!this.formSchema) {
+      this.formSchema = 'DRH';
+    }
+    this.codeSourceSaisi = `package mg.cnaps.drh.prets.entity;
+
+import javax.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+/**
+ * Demande de prêt ou d'avance sur salaire formulée par un agent de la CNaPS.
+ */
+@Entity
+@Table(name = "DEMANDE_PRET", schema = "DRH")
+@SequenceGenerator(name = "seq_demande_pret", sequenceName = "DRH.SEQ_DEMANDE_PRET", allocationSize = 1)
+public class DemandePret {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seq_demande_pret")
+    @Column(name = "ID_DEMANDE", nullable = false)
+    private Long idDemande;
+
+    @Column(name = "MATRICULE_AGENT", length = 20, nullable = false)
+    private String matriculeAgent;
+
+    @ManyToOne
+    @JoinColumn(name = "CODE_TYPE_PRET", referencedColumnName = "CODE_TYPE", nullable = false)
+    private RefTypePret typePret;
+
+    @Column(name = "MONTANT_DEMANDE", precision = 14, scale = 2, nullable = false)
+    private BigDecimal montantDemande;
+
+    @Column(name = "DUREE_REMBOURSEMENT_MOIS", precision = 3)
+    private Integer dureeRemboursementMois;
+
+    @Column(name = "DATE_DEMANDE", nullable = false)
+    private LocalDate dateDemande;
+
+    @Column(name = "STATUT_VALIDATION", length = 30)
+    private String statutValidation;
+}`;
+  }
+
+  private contexteApplicationIa(): {
+    appCode?: string;
+    appLibelle?: string;
+    appDescription?: string;
+    schemaDefaut?: string;
+  } {
+    const appExistante = !this.estNouvelleApplication
+      ? this.applications.find((a) => a.code === this.formAppCode.toUpperCase())
+      : undefined;
+    return {
+      appCode: this.estNouvelleApplication ? undefined : this.formAppCode || undefined,
+      appLibelle: this.estNouvelleApplication
+        ? this.formAppLibelle.trim() || undefined
+        : appExistante?.libelle || undefined,
+      appDescription: this.formAppDescription.trim() || undefined,
+      schemaDefaut: this.formSchema.trim() || undefined,
+    };
+  }
+
+  lancerAnalyseCode(): void {
+    if (!this.codeSourceSaisi.trim()) {
+      this.erreur = 'Veuillez saisir ou coller un extrait de code source à analyser.';
+      return;
+    }
+    const ctx = this.contexteApplicationIa();
+    this.chargementIa = true;
+    this.erreur = null;
+    this.succesMessage = null;
+    this.objetSelectionneIa = null;
+    this.dico
+      .analyserCode({
+        code: this.codeSourceSaisi,
+        nomFichier: this.nomFichierCode,
+        ...ctx,
+      })
+      .subscribe({
+        next: (res) => {
+          this.chargementIa = false;
+          this.analyseResultat = res;
+          this.succesMessage = `Analyse terminée : ${res.objets.length} objet(s) détecté(s) via ${res.moteur} (${res.dureeMs} ms).`;
+          if (res.appDescription && !this.formAppDescription) {
+            this.formAppDescription = res.appDescription;
+          }
+          if (res.objets.length > 0) {
+            this.choisirObjetIa(res.objets[0]);
+          }
+        },
+        error: (err) => {
+          this.chargementIa = false;
+          this.erreur =
+            err.error?.message || "L'analyse du code source par l'IA a échoué.";
+        },
+      });
+  }
+
+  lancerAnalyseFichiers(): void {
+    if (this.fichiersSelectionnes.length === 0) {
+      this.erreur = 'Veuillez sélectionner au moins un fichier source (.java, .sql, .zip).';
+      return;
+    }
+    const ctx = this.contexteApplicationIa();
+    this.chargementIa = true;
+    this.erreur = null;
+    this.succesMessage = null;
+    this.objetSelectionneIa = null;
+    this.dico
+      .analyserFichiers(
+        this.fichiersSelectionnes,
+        ctx.appCode,
+        ctx.appLibelle,
+        ctx.appDescription,
+        ctx.schemaDefaut
+      )
+      .subscribe({
+        next: (res) => {
+          this.chargementIa = false;
+          this.analyseResultat = res;
+          this.succesMessage = `Analyse terminée : ${res.objets.length} objet(s) détecté(s) dans ${res.fichiersAnalyses} fichier(s) via ${res.moteur} (${res.dureeMs} ms).`;
+          if (res.appDescription && !this.formAppDescription) {
+            this.formAppDescription = res.appDescription;
+          }
+          if (res.objets.length > 0) {
+            this.choisirObjetIa(res.objets[0]);
+          }
+        },
+        error: (err) => {
+          this.chargementIa = false;
+          this.erreur =
+            err.error?.message || "L'analyse des fichiers sources par l'IA a échoué.";
+        },
+      });
+  }
+
+  lancerEnrichissementOracle(): void {
+    if (!this.enrichirNomTableOracle.trim()) {
+      this.erreur = 'Veuillez indiquer le nom de la table ou vue Oracle à enrichir.';
+      return;
+    }
+    const ctx = this.contexteApplicationIa();
+    const schema = (this.enrichirSchemaOracle || this.formSchema || 'DRH').trim().toUpperCase();
+    const nom = this.enrichirNomTableOracle.trim().toUpperCase();
+    this.chargementIa = true;
+    this.erreur = null;
+    this.succesMessage = null;
+    this.objetSelectionneIa = null;
+    this.dico
+      .enrichirTableOracle({
+        schema,
+        nom,
+        appCode: ctx.appCode,
+        appLibelle: ctx.appLibelle,
+        appDescription: ctx.appDescription,
+      })
+      .subscribe({
+        next: (res) => {
+          this.chargementIa = false;
+          this.analyseResultat = res;
+          this.succesMessage = `Enrichissement terminé pour ${schema}.${nom} via ${res.moteur}.`;
+          if (res.objets.length > 0) {
+            this.choisirObjetIa(res.objets[0]);
+          }
+        },
+        error: (err) => {
+          this.chargementIa = false;
+          this.erreur =
+            err.error?.message || "L'enrichissement de la table Oracle a échoué.";
+        },
+      });
+  }
+
+  private synchroniserObjetSelectionneIa(): void {
+    if (!this.objetSelectionneIa) return;
+    const f = this.objetSelectionneIa.formulaire;
+    f.schema = this.formSchema.trim().toUpperCase();
+    f.nomObjet = this.formNomObjet.trim().toUpperCase();
+    f.typeObjet = this.formTypeObjet;
+    f.flagRef = this.formFlagRef;
+    f.description = this.formTableDescription.trim();
+    f.sequences = this.formSequences.trim();
+    f.triggers = this.formTriggers.trim();
+    f.viewScript = this.formViewScript.trim();
+    f.colonnes = this.formColonnes
+      .filter((c) => c.nom && c.nom.trim() !== '')
+      .map((c) => ({
+        ...c,
+        nom: c.nom.trim().toUpperCase(),
+      }));
+  }
+
+  choisirObjetIa(propose: DicoObjetPropose): void {
+    if (this.objetSelectionneIa && this.objetSelectionneIa !== propose) {
+      this.synchroniserObjetSelectionneIa();
+    }
+    this.objetSelectionneIa = propose;
+    const f = propose.formulaire;
+    this.formSchema = f.schema || this.formSchema || 'SIG';
+    this.formNomObjet = f.nomObjet || '';
+    this.formTypeObjet = f.typeObjet === 'VIEW' ? 'VIEW' : 'TABLE';
+    this.formFlagRef = !!f.flagRef;
+    this.formTableDescription = f.description || '';
+    this.formSequences = f.sequences || '';
+    this.formTriggers = f.triggers || '';
+    this.formViewScript = f.viewScript || '';
+    this.formColonnes =
+      f.colonnes && f.colonnes.length > 0
+        ? f.colonnes.map((c) => ({
+            nom: c.nom || '',
+            typeBase: c.typeBase || 'VARCHAR2',
+            taille: c.taille || '',
+            contrainte: c.contrainte || '',
+            niveauSensibilite: c.niveauSensibilite ?? 1,
+            defaut: c.defaut || '',
+            description: c.description || '',
+            index: c.index || '',
+            observation: c.observation || '',
+          }))
+        : [
+            {
+              nom: '',
+              typeBase: 'VARCHAR2',
+              taille: '50',
+              contrainte: 'PK',
+              niveauSensibilite: 1,
+              defaut: '',
+              description: '',
+              index: '',
+              observation: '',
+            },
+          ];
+  }
+
+  enregistrerToutLot(): void {
+    if (!this.analyseResultat || !this.analyseResultat.objets.length) return;
+    if (this.estNouvelleApplication) {
+      if (!this.formAppLibelle.trim()) {
+        this.erreur =
+          "Veuillez renseigner le nom / libellé de la nouvelle application à l'étape 01 avant d'enregistrer le lot.";
+        return;
+      }
+    } else if (!this.formAppCode) {
+      this.erreur =
+        "Veuillez sélectionner une application cible à l'étape 01 avant d'enregistrer le lot.";
+      return;
+    }
+
+    this.synchroniserObjetSelectionneIa();
+    const ctx = this.contexteApplicationIa();
+
+    this.enregistrementLotEnCours = true;
+    this.erreur = null;
+    this.succesMessage = null;
+
+    const lot: DicoFormulaireObjet[] = this.analyseResultat.objets.map((p) => {
+      const f = { ...p.formulaire };
+      f.appCode = ctx.appCode;
+      f.appLibelle = ctx.appLibelle;
+      f.appDescription = ctx.appDescription || f.appDescription;
+      f.schema = (f.schema || this.formSchema || 'SIG').trim().toUpperCase();
+      return f;
+    });
+
+    this.dico.enregistrerLot(lot).subscribe({
+      next: (sauvegardes) => {
+        this.enregistrementLotEnCours = false;
+        this.modalIaOuverte = false;
+        const premier = sauvegardes[0];
+        const codeGenere = premier?.objet?.appCode || ctx.appCode || '';
+        this.selectedAppCode = codeGenere;
+
+        this.dico.applications().subscribe((apps) => (this.applications = apps));
+        this.dico.schemas().subscribe((s) => (this.schemas = s));
+        if (codeGenere) {
+          this.dico.fiche(codeGenere).subscribe((f) => (this.fiche = f));
+        }
+
+        this.vueMode = 'consultation';
+        const nomAppAffiche =
+          premier?.objet?.appLibelle || ctx.appLibelle || codeGenere;
+        this.succesMessage = `${sauvegardes.length} objet(s) générés par l'IA ont été enregistrés dans IAM.DICO_DATA_* pour l'application « ${nomAppAffiche} ».`;
+
+        this.dico.objets(codeGenere || undefined).subscribe({
+          next: (objets) => {
+            this.objets = objets;
+            if (premier) {
+              this.selectedObjet = premier.objet;
+              this.detail = premier;
+            }
+          },
+        });
+      },
+      error: (err) => {
+        this.enregistrementLotEnCours = false;
+        this.erreur =
+          err.error?.message ||
+          "Une erreur est survenue lors de l'enregistrement groupé des objets.";
+      },
+    });
   }
 
   classeSensibilite(niveau: number | null): string {
