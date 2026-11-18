@@ -45,6 +45,7 @@ public class CodeAnalyzer {
         public final Map<String, ObjetAnalyse> objets = new LinkedHashMap<>();
         public final List<String> avertissements = new ArrayList<>();
         public int fichiersAnalyses;
+        public String appLibelleDetecte;
     }
 
     // ------------------------------------------------------------------ Expressions régulières communes
@@ -115,11 +116,13 @@ public class CodeAnalyzer {
           + "(?:\\s*\\(([^)]*)\\))?(\\s+WITH\\s+(?:LOCAL\\s+)?TIME\\s+ZONE)?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern SQL_DEFAUT = Pattern.compile(
-            "\\bDEFAULT\\s+(?:ON\\s+NULL\\s+)?('(?:[^']|'')*'|[\\w.$#]+(?:\\s*\\([^)]*\\))?)",
+            "(?<!BY\\s)\\bDEFAULT\\s+(?:ON\\s+NULL\\s+)?('(?:[^']|'')*'|[\\w.$#]+(?:\\s*\\([^)]*\\))?)",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern SQL_REFERENCES = Pattern.compile(
             "\\bREFERENCES\\s+" + NOM + "\\s*(?:\\(([^)]*)\\))?", Pattern.CASE_INSENSITIVE);
     private static final Pattern SQL_NEXTVAL = Pattern.compile("([\\w$#\".]+)\\s*\\.\\s*NEXTVAL", Pattern.CASE_INSENSITIVE);
+    private static final Pattern META_APPLICATION = Pattern.compile(
+            "(?im)^\\s*(?:--|/\\*+|\\*)\\s*APPLICATION\\s*:\\s*(.+?)$");
 
     private static final Set<String> MOTS_RESERVES = new HashSet<>(Arrays.asList(
             "SELECT", "DUAL", "WHERE", "TABLE", "LATERAL", "THE", "VALUES", "SET", "ONLY", "UNNEST", "AND", "OR",
@@ -138,6 +141,13 @@ public class CodeAnalyzer {
         for (FichierSource f : fichiers) {
             if (f == null || vide(f.contenu)) continue;
             res.fichiersAnalyses++;
+            if (res.appLibelleDetecte == null) {
+                Matcher ma = META_APPLICATION.matcher(f.contenu);
+                if (ma.find()) {
+                    String lib = ma.group(1).replaceAll("\\*/.*$", "").trim();
+                    if (!lib.isEmpty()) res.appLibelleDetecte = lib;
+                }
+            }
             String nom = f.nom == null ? "" : f.nom.toLowerCase(Locale.ROOT);
             if (nom.endsWith(".java") || (!nom.matches(".*\\.(sql|pls|plb|pks|pkb|trg|ddl)$") && ressembleJava(f.contenu))) {
                 java.add(f);
@@ -170,6 +180,9 @@ public class CodeAnalyzer {
 
         // 4) Association des séquences orphelines par convention de nommage
         associerSequences(ctx);
+
+        // 5) Résolution des types et tailles des colonnes de vues à partir des tables sources
+        resoudreColonnesVues(ctx);
         return res;
     }
 
@@ -190,8 +203,24 @@ public class CodeAnalyzer {
         }
 
         ObjetAnalyse objet(String schema, String nom, String source) {
-            String s = schema != null ? normaliser(schema) : schemaDefaut;
             String n = normaliser(nom);
+            String s = schema != null ? normaliser(schema) : null;
+            if (s == null) {
+                for (ObjetAnalyse exist : res.objets.values()) {
+                    if (n != null && n.equals(exist.nom) && exist.schema != null) {
+                        if (source != null) exist.sources.add(source);
+                        return exist;
+                    }
+                }
+                if (n != null) {
+                    if (n.startsWith("DRH_")) s = "DRH";
+                    else if (n.startsWith("CPT_") || n.equals("CNAPS_USER")) s = "TRESO";
+                    else if (n.startsWith("RV_") || n.startsWith("DICO_") || n.equals("REVUE_MATRICE")
+                            || n.equals("MODIF_OBS_RV") || n.equals("PARAM_PRIVILEGE")
+                            || n.equals("BESOIN_SERVICE") || n.equals("TYPE_ACTION")) s = "IAM";
+                }
+                if (s == null) s = schemaDefaut;
+            }
             String cle = (s == null ? "?" : s) + "." + n;
             ObjetAnalyse o = res.objets.get(cle);
             if (o == null) {
@@ -440,20 +469,25 @@ public class CodeAnalyzer {
                 col.taille = lob ? null : (length != null ? length : "255");
                 break;
             case "Long": case "long": case "BigInteger":
-                col.typeBase = "NUMBER"; col.taille = "19"; break;
+                col.typeBase = "NUMBER";
+                col.taille = precision != null && !"0".equals(precision) ? precision : "19";
+                break;
             case "Integer": case "int":
-                col.typeBase = "NUMBER"; col.taille = "10"; break;
+                col.typeBase = "NUMBER";
+                col.taille = precision != null && !"0".equals(precision) ? precision : "10";
+                break;
             case "Short": case "short":
-                col.typeBase = "NUMBER"; col.taille = "5"; break;
+                col.typeBase = "NUMBER";
+                col.taille = precision != null && !"0".equals(precision) ? precision : "5";
+                break;
             case "Byte": case "byte":
                 col.typeBase = "NUMBER"; col.taille = "3"; break;
             case "BigDecimal":
+            case "Double": case "double": case "Float": case "float":
                 col.typeBase = "NUMBER";
                 col.taille = precision != null && !"0".equals(precision)
                         ? precision + (scale != null && !"0".equals(scale) ? "," + scale : "") : null;
                 break;
-            case "Double": case "double": case "Float": case "float":
-                col.typeBase = "NUMBER"; col.taille = null; break;
             case "Boolean": case "boolean":
                 col.typeBase = "NUMBER"; col.taille = "1"; break;
             case "Character": case "char":
@@ -607,7 +641,7 @@ public class CodeAnalyzer {
             ObjetAnalyse o = ctx.objetQualifie(m.group(2), source);
             o.type = "VIEW";
             String select = m.group(4).trim();
-            o.viewScript = select;
+            o.viewScript = inst.trim().endsWith(";") ? inst.trim() : inst.trim() + ";";
             if (m.group(1) != null) o.alertes.add("Vue matérialisée");
             List<String> cols = new ArrayList<>();
             if (!vide(m.group(3))) {
@@ -671,8 +705,14 @@ public class CodeAnalyzer {
         String suite = parties[1];
         appliquerTypeSql(col, suite);
         String maj = suite.toUpperCase(Locale.ROOT);
-        Matcher md = SQL_DEFAUT.matcher(suite);
-        if (md.find()) col.defaut = md.group(1);
+        String suiteSansIdentity = suite.replaceAll("(?i)\\bGENERATED\\s+(?:ALWAYS|BY\\s+DEFAULT(?:\\s+ON\\s+NULL)?)\\s+AS\\s+IDENTITY(?:\\s*\\([^)]*\\))?", "");
+        Matcher md = SQL_DEFAUT.matcher(suiteSansIdentity);
+        if (md.find()) {
+            String valDef = md.group(1).trim();
+            if (!valDef.equalsIgnoreCase("AS") && !valDef.equalsIgnoreCase("NULL") && !valDef.equalsIgnoreCase("NOT")) {
+                col.defaut = valDef;
+            }
+        }
         if (maj.matches("(?s).*\\bNOT\\s+NULL\\b.*")) col.nullable = false;
         if (maj.matches("(?s).*\\bPRIMARY\\s+KEY\\b.*")) { col.pk = true; col.nullable = false; }
         if (maj.matches("(?s).*\\bUNIQUE\\b.*")) col.uk = true;
@@ -694,8 +734,17 @@ public class CodeAnalyzer {
             col.taille = "38";
         } else {
             col.typeBase = type + (mt.group(3) != null ? mt.group(3).toUpperCase(Locale.ROOT).replaceAll("\\s+", " ") : "");
-            col.taille = mt.group(2) == null ? null
-                    : mt.group(2).replaceAll("(?i)\\s*(BYTE|CHAR)\\s*", "").replaceAll("\\s+", "");
+            if (type.startsWith("TIMESTAMP") || type.equals("DATE")) {
+                col.taille = null;
+            } else {
+                String nouvelleTaille = mt.group(2) == null ? null
+                        : mt.group(2).replaceAll("(?i)\\s*(BYTE|CHAR)\\s*", "").replaceAll("\\s+", "");
+                if (nouvelleTaille != null) {
+                    col.taille = nouvelleTaille;
+                } else if (col.taille == null && "NUMBER".equals(type) && definition.toUpperCase(Locale.ROOT).contains("IDENTITY")) {
+                    col.taille = "19";
+                }
+            }
         }
         col.typeFiable = true;
     }
@@ -730,7 +779,20 @@ public class CodeAnalyzer {
     private static String reference(String table, String colonne, Contexte ctx) {
         if (table == null) return null;
         String[] p = separer(table);
-        String schema = p[0] != null ? p[0] : ctx.schemaDefaut;
+        String schema = p[0];
+        if (schema == null && p[1] != null) {
+            for (ObjetAnalyse exist : ctx.res.objets.values()) {
+                if (p[1].equals(exist.nom) && exist.schema != null) {
+                    schema = exist.schema;
+                    break;
+                }
+            }
+            if (schema == null) {
+                if (p[1].startsWith("DRH_")) schema = "DRH";
+                else if (p[1].startsWith("CPT_") || p[1].equals("CNAPS_USER")) schema = "TRESO";
+                else schema = ctx.schemaDefaut;
+            }
+        }
         String col = colonne == null ? "?" : normaliser(colonne.trim());
         return (schema == null ? "" : schema + ".") + p[1] + "(" + col + ")";
     }
@@ -758,6 +820,51 @@ public class CodeAnalyzer {
             } else {
                 ctx.res.avertissements.add("Séquence " + e.getKey() + " (" + e.getValue()
                         + ") non rattachée à une table : à associer manuellement.");
+            }
+        }
+    }
+
+    /** Complète les types, tailles et origines des colonnes d'une VUE à partir des tables sources du même lot. */
+    private void resoudreColonnesVues(Contexte ctx) {
+        for (ObjetAnalyse vue : ctx.res.objets.values()) {
+            if (!"VIEW".equals(vue.type)) continue;
+            List<ObjetAnalyse> tablesSources = new ArrayList<>();
+            if (vue.viewScript != null) {
+                Matcher m = SQL_REF_TABLE.matcher(vue.viewScript);
+                while (m.find()) {
+                    String brut = m.group(1) != null ? m.group(1) : m.group(2);
+                    if (brut == null) continue;
+                    ObjetAnalyse src = ctx.existant(brut);
+                    if (src != null && !"VIEW".equals(src.type) && !tablesSources.contains(src)) {
+                        tablesSources.add(src);
+                    }
+                }
+            }
+            if (tablesSources.isEmpty()) {
+                for (ObjetAnalyse o : ctx.res.objets.values()) {
+                    if (!"VIEW".equals(o.type)) tablesSources.add(o);
+                }
+            }
+            for (ColonneAnalyse colVue : vue.colonnes.values()) {
+                for (ObjetAnalyse src : tablesSources) {
+                    ColonneAnalyse colSrc = src.colonnes.get(colVue.nom);
+                    if (colSrc != null) {
+                        if (colVue.typeBase == null && colSrc.typeBase != null) {
+                            colVue.typeBase = colSrc.typeBase;
+                            colVue.taille = colSrc.taille;
+                        }
+                        if (colVue.nullable == null && colSrc.nullable != null) {
+                            colVue.nullable = colSrc.nullable;
+                        }
+                        if (vide(colVue.description) && !vide(colSrc.description)) {
+                            colVue.description = colSrc.description;
+                        }
+                        if (vide(colVue.observation)) {
+                            colVue.observation = "Issu de " + src.nom;
+                        }
+                        break;
+                    }
+                }
             }
         }
     }
@@ -999,9 +1106,14 @@ public class CodeAnalyzer {
         String t = javadoc.replaceAll("^\\s*/\\*\\*", "").replaceAll("\\*/\\s*$", "")
                 .replaceAll("(?m)^\\s*\\*\\s?", "")
                 .replaceAll("(?m)^@\\w+.*$", "")
+                .replaceAll("(?im)^\\s*(?:Application|Sch[eé]ma(?:\\s+Oracle)?|Domaine|Auteur|Version)\\s*:.*$", "")
+                .replaceAll("(?im)^\\s*Correspondance exacte avec.*$", "")
                 .replaceAll("<[^>]+>", "")
                 .replaceAll("\\{@\\w+\\s+([^}]*)}", "$1")
                 .replaceAll("\\s+", " ").trim();
+        t = t.replaceFirst("(?i)^Entit[eé]\\s+repr[eé]sentant\\s+(?:un|une|les|des|le|la)\\s+", "Table enregistrant les ")
+             .replaceFirst("(?i)^Entit[eé]\\s+d[eé]taillant\\s+", "Table détaillant ")
+             .replaceFirst("(?i)^Entit[eé]\\s+d'", "Table d'");
         return t.isEmpty() ? null : t;
     }
 

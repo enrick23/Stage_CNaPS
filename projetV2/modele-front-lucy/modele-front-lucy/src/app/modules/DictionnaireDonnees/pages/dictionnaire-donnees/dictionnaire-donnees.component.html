@@ -99,6 +99,40 @@
       </div>
     </div>
 
+    <!-- BARRE DE NAVIGATION DES OBJETS DÉTECTÉS PAR L'IA (SI ANALYSE EN COURS) -->
+    <div class="ia-detected-strip" *ngIf="analyseResultat && analyseResultat.objets.length > 0">
+      <div class="strip-left">
+        <span class="strip-label">Objets détectés ({{ analyseResultat.objets.length }}) :</span>
+        <div class="strip-pills">
+          <button
+            type="button"
+            class="strip-pill"
+            *ngFor="let p of analyseResultat.objets"
+            [class.active]="objetSelectionneIa === p"
+            (click)="choisirObjetIa(p)"
+          >
+            <span class="pill-schema">{{ p.formulaire.schema }}.</span><strong>{{ p.formulaire.nomObjet }}</strong>
+            <span class="pill-type">{{ p.formulaire.typeObjet === 'VIEW' ? 'VUE' : (p.formulaire.flagRef ? 'RÉF' : 'TABLE') }}</span>
+          </button>
+        </div>
+      </div>
+      <div class="strip-right">
+        <button
+          type="button"
+          class="btn-save-batch"
+          [disabled]="enregistrementLotEnCours"
+          (click)="enregistrerToutLot()"
+        >
+          <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          <span>Tout enregistrer ({{ analyseResultat.objets.length }})</span>
+        </button>
+      </div>
+    </div>
+
     <form (ngSubmit)="enregistrerDictionnaire()" class="creation-form">
       <!-- SECTION 1 : APPLICATION & SCHÉMA (Colonnes A & B du fichier Excel) -->
       <div class="form-card">
@@ -607,7 +641,6 @@
           <div><dt>Code</dt><dd>{{ fiche.application.code }}</dd></div>
           <div><dt>Objets rattachés</dt><dd>{{ objets.length }}</dd></div>
           <div><dt>Source</dt><dd>IAM.DICO_DATA_*</dd></div>
-          <div><dt>Accès base</dt><dd>Confidentiel (jamais affiché)</dd></div>
         </dl>
       </div>
       <div class="app-endpoints" *ngIf="fiche.sourceArchitectureRaccordee">
@@ -895,6 +928,8 @@
 
       <!-- Corps de la modale -->
       <div class="ia-modal-body">
+        <p class="notice error modal-notice" *ngIf="erreur">{{ erreur }}</p>
+        <p class="notice success modal-notice" *ngIf="succesMessage">{{ succesMessage }}</p>
 
         <!-- Onglets des modes d'entrée -->
         <div class="ia-modal-tabs">

@@ -130,6 +130,9 @@ public class DictionnaireAiService {
         CodeAnalyzer.Resultat brut = analyseur.analyser(fichiers, schemaDefaut);
         res.fichiersAnalyses = brut.fichiersAnalyses;
         res.avertissements.addAll(brut.avertissements);
+        if (vide(res.appLibelle) && !vide(brut.appLibelleDetecte)) {
+            res.appLibelle = brut.appLibelleDetecte;
+        }
         Map<String, ObjetAnalyse> objets = brut.objets;
 
         // Étape 3 — croisement Oracle

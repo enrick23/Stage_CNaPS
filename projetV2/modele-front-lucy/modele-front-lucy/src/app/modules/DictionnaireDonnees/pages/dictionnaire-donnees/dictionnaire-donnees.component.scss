@@ -293,6 +293,83 @@ textarea.form-input{height:auto;padding:8px 10px;font-family:var(--font-cnaps);r
   box-shadow: 0 2px 5px rgba(11, 92, 173, 0.2);
 }
 
+/* Barre des objets détectés par l'IA au-dessus du formulaire */
+.ia-detected-strip {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.strip-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.strip-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+.strip-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.strip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.strip-pill .pill-schema {
+  color: #64748b;
+  font-size: 11px;
+}
+.strip-pill .pill-type {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.strip-pill:hover {
+  border-color: var(--b);
+  background: #f0f7ff;
+}
+.strip-pill.active {
+  border-color: var(--b);
+  background: var(--b);
+  color: #ffffff;
+}
+.strip-pill.active .pill-schema {
+  color: #dbeafe;
+}
+.strip-pill.active .pill-type {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+.modal-notice {
+  margin: 0 0 14px;
+}
+
 /* ========================================================================= */
 /* MODALE DÉDIÉE : ASSISTANT IA (FENÊTRE DIALOGUE CENTRÉE)                   */
 /* ========================================================================= */

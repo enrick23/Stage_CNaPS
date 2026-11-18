@@ -46,24 +46,32 @@ public class CatalogueOracle {
     /** Croise un objet avec Oracle. Retourne false si le catalogue est inaccessible. */
     public boolean croiser(ObjetAnalyse o) {
         try {
-            if (o.schema == null) {
-                List<String> proprietaires = jdbc.query(
-                        "SELECT owner FROM all_objects WHERE object_name = ? AND object_type IN ('TABLE','VIEW') "
-                      + " AND owner NOT IN ('SYS','SYSTEM','PUBLIC') ORDER BY owner",
-                        (rs, i) -> rs.getString(1), o.nom);
-                if (proprietaires.isEmpty()) {
+            List<String> types = new java.util.ArrayList<>();
+            if (o.schema != null) {
+                types = jdbc.query(
+                        "SELECT object_type FROM all_objects WHERE owner = ? AND object_name = ? AND object_type IN ('TABLE','VIEW')",
+                        (rs, i) -> rs.getString(1), o.schema, o.nom);
+            }
+            if (types.isEmpty()) {
+                List<String[]> trouves = jdbc.query(
+                        "SELECT owner, object_type FROM all_objects WHERE object_name = ? AND object_type IN ('TABLE','VIEW') "
+                      + " AND owner NOT IN ('SYS','SYSTEM','PUBLIC','OUTLN','DBSNMP','APPQOSSYS','WMSYS','CTXSYS','XDB','MDSYS','ORDSYS','OLAPSYS') "
+                      + " ORDER BY owner",
+                        (rs, i) -> new String[]{rs.getString(1), rs.getString(2)}, o.nom);
+                if (!trouves.isEmpty()) {
+                    String ancienSchema = o.schema;
+                    o.schema = trouves.get(0)[0];
+                    for (String[] t : trouves) {
+                        if (t[0].equals(o.schema)) types.add(t[1]);
+                    }
+                    if (ancienSchema != null && !ancienSchema.equals(o.schema)) {
+                        o.alertes.add("Objet trouvé dans le schéma Oracle « " + o.schema + " » (au lieu de « " + ancienSchema + " »).");
+                    }
+                } else if (o.schema == null) {
                     o.alertes.add("Schéma non précisé et objet introuvable dans Oracle : schéma à renseigner.");
                     return true;
                 }
-                o.schema = proprietaires.get(0);
-                if (proprietaires.size() > 1) {
-                    o.alertes.add("Objet présent dans plusieurs schémas " + proprietaires + " : " + o.schema + " retenu, à vérifier.");
-                }
             }
-
-            List<String> types = jdbc.query(
-                    "SELECT object_type FROM all_objects WHERE owner = ? AND object_name = ? AND object_type IN ('TABLE','VIEW')",
-                    (rs, i) -> rs.getString(1), o.schema, o.nom);
             o.existeEnBase = !types.isEmpty();
             if (!o.existeEnBase) {
                 o.alertes.add("Objet absent de la base Oracle : structure déduite du code source (application en conception).");
@@ -120,7 +128,7 @@ public class CatalogueOracle {
                     String nom = rs.getString(1);
                     ColonneAnalyse col = o.colonnes.containsKey(nom) ? o.colonnes.get(nom) : new ColonneAnalyse(nom);
                     String type = rs.getString(2);
-                    col.typeBase = type;
+                    col.typeBase = type != null && type.toUpperCase(Locale.ROOT).startsWith("TIMESTAMP") ? "TIMESTAMP" : type;
                     col.taille = taille(type, rs.getObject(3), rs.getObject(4), rs.getObject(5), rs.getObject(6));
                     col.nullable = !"N".equals(rs.getString(8));
                     String comm = rs.getString(9);

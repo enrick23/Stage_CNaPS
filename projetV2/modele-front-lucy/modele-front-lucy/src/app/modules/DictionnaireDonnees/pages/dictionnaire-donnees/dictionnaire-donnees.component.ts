@@ -98,7 +98,17 @@ export class DictionnaireDonneesComponent implements OnInit {
     'CLOB',
     'BLOB',
   ];
-  readonly contraintesDisponibles = ['PK', 'FK', 'Not null', 'UK', 'PK, Not null', ''];
+  readonly contraintesDisponibles = [
+    'PK',
+    'FK',
+    'Not null',
+    'UK',
+    'PK, Not null',
+    'FK, Not null',
+    'UK, Not null',
+    'PK, FK',
+    '',
+  ];
   readonly niveauxSensibilite = [
     { valeur: 1, libelle: '1 - Public' },
     { valeur: 2, libelle: '2 - Interne' },
@@ -545,9 +555,31 @@ export class DictionnaireDonneesComponent implements OnInit {
   }
 
   appliquerEtFermerModalIa(propose: DicoObjetPropose): void {
+    this.vueMode = 'creation';
     this.choisirObjetIa(propose);
     this.modalIaOuverte = false;
     this.succesMessage = `Structure de ${propose.formulaire.schema}.${propose.formulaire.nomObjet} appliquée au formulaire avec succès.`;
+  }
+
+  private appliquerContexteAppDetecte(res: DicoAnalyseResultat): void {
+    if (res.appDescription && !this.formAppDescription.trim()) {
+      this.formAppDescription = res.appDescription;
+    }
+    if (res.appLibelle && !this.formAppCode && !this.formAppLibelle.trim()) {
+      const lib = res.appLibelle.trim();
+      const existante = this.applications.find(
+        (a) =>
+          a.libelle.toLowerCase() === lib.toLowerCase() ||
+          lib.toLowerCase().includes(a.libelle.toLowerCase())
+      );
+      if (existante) {
+        this.estNouvelleApplication = false;
+        this.formAppCode = existante.code;
+      } else {
+        this.estNouvelleApplication = true;
+        this.formAppLibelle = lib;
+      }
+    }
   }
 
   changerModeSaisieIa(mode: 'fichiers' | 'code' | 'oracle'): void {
@@ -690,9 +722,7 @@ public class DemandePret {
           this.chargementIa = false;
           this.analyseResultat = res;
           this.succesMessage = `Analyse terminée : ${res.objets.length} objet(s) détecté(s) via ${res.moteur} (${res.dureeMs} ms).`;
-          if (res.appDescription && !this.formAppDescription) {
-            this.formAppDescription = res.appDescription;
-          }
+          this.appliquerContexteAppDetecte(res);
           if (res.objets.length > 0) {
             this.choisirObjetIa(res.objets[0]);
           }
@@ -728,9 +758,7 @@ public class DemandePret {
           this.chargementIa = false;
           this.analyseResultat = res;
           this.succesMessage = `Analyse terminée : ${res.objets.length} objet(s) détecté(s) dans ${res.fichiersAnalyses} fichier(s) via ${res.moteur} (${res.dureeMs} ms).`;
-          if (res.appDescription && !this.formAppDescription) {
-            this.formAppDescription = res.appDescription;
-          }
+          this.appliquerContexteAppDetecte(res);
           if (res.objets.length > 0) {
             this.choisirObjetIa(res.objets[0]);
           }
