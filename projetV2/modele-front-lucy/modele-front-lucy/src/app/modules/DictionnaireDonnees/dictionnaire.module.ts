@@ -9,6 +9,7 @@ import { CatalogueComponent } from './pages/catalogue/catalogue.component';
 import { FicheApplicationComponent } from './pages/fiche-application/fiche-application.component';
 import { DocumenterComponent } from './pages/documenter/documenter.component';
 import { ExportComponent } from './pages/export/export.component';
+import { FicheObjetComponent } from './components/fiche-objet/fiche-objet.component';
 
 @NgModule({
   declarations: [
@@ -19,6 +20,7 @@ import { ExportComponent } from './pages/export/export.component';
     FicheApplicationComponent,
     DocumenterComponent,
     ExportComponent,
+    FicheObjetComponent,
   ],
   imports: [CommonModule, FormsModule, DictionnaireRoutingModule],
 })
