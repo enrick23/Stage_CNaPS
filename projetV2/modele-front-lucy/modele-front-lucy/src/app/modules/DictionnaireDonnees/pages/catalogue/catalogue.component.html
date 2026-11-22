@@ -1,2 +1,134 @@
-<h2>Catalogue</h2>
-<p>Catalogue unique des applications (en construction).</p>
+<section>
+  <header>
+    <h2>Catalogue des applications</h2>
+    <p>
+      <a [routerLink]="['/dictionnaire/documenter']" [queryParams]="{ mode: 'formulaire' }">
+        Nouvelle application
+      </a>
+    </p>
+  </header>
+
+  <div>
+    <label for="recherche-catalogue">Rechercher une application (code ou libellé) :</label>
+    <input
+      id="recherche-catalogue"
+      type="search"
+      [ngModel]="recherche"
+      (ngModelChange)="onRechercheChange($event)"
+      placeholder="Ex : DRH, retraite, trésorerie..."
+    />
+  </div>
+
+  <div role="group" aria-label="Filtrer par statut d'application">
+    <button
+      type="button"
+      [class.active]="statutFiltre === ''"
+      (click)="choisirStatut('')"
+    >
+      Toutes ({{ compteurToutes }})
+    </button>
+    <button
+      type="button"
+      [class.active]="statutFiltre === 'EXISTANTE_DOCUMENTEE'"
+      (click)="choisirStatut('EXISTANTE_DOCUMENTEE')"
+    >
+      Existantes ({{ compteurExistantes }})
+    </button>
+    <button
+      type="button"
+      [class.active]="statutFiltre === 'EN_CONCEPTION'"
+      (click)="choisirStatut('EN_CONCEPTION')"
+    >
+      En conception ({{ compteurEnConception }})
+    </button>
+    <button
+      type="button"
+      [class.active]="statutFiltre === 'EXISTANTE_NON_DOCUMENTEE'"
+      (click)="choisirStatut('EXISTANTE_NON_DOCUMENTEE')"
+    >
+      Non documentées ({{ compteurNonDocumentees }})
+    </button>
+  </div>
+
+  <p *ngIf="chargement">Chargement du catalogue des applications…</p>
+  <p *ngIf="erreur">{{ erreur }}</p>
+
+  <ng-container *ngIf="!chargement && !erreur">
+    <p *ngIf="applicationsFiltrees.length === 0">
+      Aucune application ne correspond aux critères sélectionnés.
+    </p>
+
+    <ng-container *ngIf="applicationsFiltrees.length > 0">
+      <p>
+        {{ applicationsFiltrees.length }} application(s) trouvée(s) — Page {{ pageCourante }} sur {{ totalPages }}
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Application</th>
+            <th>Statut</th>
+            <th>Schémas</th>
+            <th>Objets documentés</th>
+            <th>Couverture (créés / documentés)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let app of applicationsPaginees">
+            <td>
+              <a [routerLink]="['/dictionnaire/catalogue', app.code]">
+                <strong>{{ app.code }}</strong> — {{ app.libelle }}
+              </a>
+            </td>
+            <td>{{ libelleStatut(app.statut) }}</td>
+            <td>{{ app.schemas.length ? app.schemas.join(', ') : '—' }}</td>
+            <td>{{ app.nbObjets }}</td>
+            <td>{{ app.nbObjetsCrees }} / {{ app.nbObjets }}</td>
+            <td>
+              <a
+                *ngIf="estApplicationExistante(app.statut)"
+                [routerLink]="['/dictionnaire/documenter']"
+                [queryParams]="{ mode: 'ia', application: app.code }"
+              >
+                Documenter avec l'IA
+              </a>
+              <a
+                *ngIf="app.statut === 'EN_CONCEPTION'"
+                [routerLink]="['/dictionnaire/documenter']"
+                [queryParams]="{ mode: 'formulaire', application: app.code }"
+              >
+                Continuer la saisie
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <nav aria-label="Pagination du catalogue" *ngIf="totalPages > 1">
+        <button
+          type="button"
+          [disabled]="pageCourante <= 1"
+          (click)="allerAPage(pageCourante - 1)"
+        >
+          Précédent
+        </button>
+        <button
+          type="button"
+          *ngFor="let p of pagesDisponibles"
+          [class.active]="p === pageCourante"
+          (click)="allerAPage(p)"
+        >
+          {{ p }}
+        </button>
+        <button
+          type="button"
+          [disabled]="pageCourante >= totalPages"
+          (click)="allerAPage(pageCourante + 1)"
+        >
+          Suivant
+        </button>
+      </nav>
+    </ng-container>
+  </ng-container>
+</section>

@@ -1,28 +1,111 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
+import {
+  ApplicationCatalogue,
+  ObjetCatalogue,
+  StatutApplication,
+  StatutObjet,
+} from '../../models/catalogue.model';
+import { CatalogueService } from '../../services/catalogue.service';
 
-/** Fiche d'une application du catalogue (contenu construit en T3). */
+/**
+ * Fiche d'une application du catalogue unique (T3) :
+ * affiche le libellé, le statut, les schémas et la liste des objets avec leur
+ * statut individuel (« Créée dans Oracle » / « Pas encore créée »).
+ * Chaque objet pointe provisoirement vers /dictionnaire/ancien en attendant
+ * la page dédiée de fiche objet.
+ */
 @Component({
   selector: 'app-dictionnaire-fiche-application',
   templateUrl: './fiche-application.component.html',
 })
 export class FicheApplicationComponent implements OnInit, OnDestroy {
   codeApplication = '';
-  private abonnement?: Subscription;
+  application: ApplicationCatalogue | null = null;
+  objets: ObjetCatalogue[] = [];
+  chargement = false;
+  erreur: string | null = null;
 
-  constructor(private route: ActivatedRoute) {}
+  private abonnementRoute?: Subscription;
+  private abonnementDonnees?: Subscription;
+
+  constructor(
+    private route: ActivatedRoute,
+    private catalogueService: CatalogueService
+  ) {}
 
   ngOnInit(): void {
     // paramMap (et non snapshot) : le composant est réutilisé si seul :application change.
-    this.abonnement = this.route.paramMap.subscribe((params) => {
-      this.codeApplication = params.get('application') || '';
+    this.abonnementRoute = this.route.paramMap.subscribe((params) => {
+      this.codeApplication = (params.get('application') || '').trim().toUpperCase();
+      this.chargerFiche();
     });
   }
 
   ngOnDestroy(): void {
-    if (this.abonnement) {
-      this.abonnement.unsubscribe();
+    if (this.abonnementRoute) {
+      this.abonnementRoute.unsubscribe();
     }
+    if (this.abonnementDonnees) {
+      this.abonnementDonnees.unsubscribe();
+    }
+  }
+
+  chargerFiche(): void {
+    if (!this.codeApplication) {
+      this.application = null;
+      this.objets = [];
+      return;
+    }
+
+    if (this.abonnementDonnees) {
+      this.abonnementDonnees.unsubscribe();
+    }
+
+    this.chargement = true;
+    this.erreur = null;
+    this.application = null;
+    this.objets = [];
+
+    this.abonnementDonnees = forkJoin([
+      this.catalogueService.listerApplications(),
+      this.catalogueService.listerObjets(this.codeApplication),
+    ]).subscribe({
+      next: ([applications, objets]) => {
+        this.chargement = false;
+        const trouvee = (applications || []).find(
+          (a) => (a.code || '').trim().toUpperCase() === this.codeApplication
+        );
+        this.application = trouvee || null;
+        this.objets = objets || [];
+        if (!this.application) {
+          this.erreur = `Aucune application trouvée avec le code « ${this.codeApplication} ».`;
+        }
+      },
+      error: () => {
+        this.chargement = false;
+        this.erreur = `Impossible de charger la fiche de l'application « ${this.codeApplication} ».`;
+      },
+    });
+  }
+
+  libelleStatutApplication(statut: StatutApplication): string {
+    switch (statut) {
+      case 'EXISTANTE_DOCUMENTEE':
+        return 'Existante documentée';
+      case 'EN_CONCEPTION':
+        return 'En conception';
+      case 'EXISTANTE_NON_DOCUMENTEE':
+        return 'Existante non documentée';
+    }
+  }
+
+  libelleStatutObjet(statut: StatutObjet): string {
+    return statut === 'CREE' ? 'Créée dans Oracle' : 'Pas encore créée';
+  }
+
+  estApplicationExistante(statut: StatutApplication): boolean {
+    return statut === 'EXISTANTE_DOCUMENTEE' || statut === 'EXISTANTE_NON_DOCUMENTEE';
   }
 }

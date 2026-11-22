@@ -1,3 +1,81 @@
-<h2>Fiche application : {{ codeApplication }}</h2>
-<p>Fiche détaillée de l'application (en construction).</p>
-<p><a routerLink="/dictionnaire/catalogue">Retour au catalogue</a></p>
+<section>
+  <p><a routerLink="/dictionnaire/catalogue">Retour au catalogue</a></p>
+
+  <p *ngIf="chargement">Chargement de la fiche application…</p>
+  <p *ngIf="erreur">{{ erreur }}</p>
+
+  <ng-container *ngIf="!chargement && application">
+    <header>
+      <h2>{{ application.libelle }} ({{ application.code }})</h2>
+    </header>
+
+    <dl>
+      <div>
+        <dt>Code</dt>
+        <dd>{{ application.code }}</dd>
+      </div>
+      <div>
+        <dt>Libellé</dt>
+        <dd>{{ application.libelle }}</dd>
+      </div>
+      <div>
+        <dt>Statut</dt>
+        <dd>{{ libelleStatutApplication(application.statut) }}</dd>
+      </div>
+      <div>
+        <dt>Schémas Oracle</dt>
+        <dd>{{ application.schemas.length ? application.schemas.join(', ') : '—' }}</dd>
+      </div>
+      <div>
+        <dt>Couverture Oracle</dt>
+        <dd>{{ application.nbObjetsCrees }} / {{ application.nbObjets }} objet(s) créé(s) dans Oracle</dd>
+      </div>
+    </dl>
+
+    <p>
+      <a
+        *ngIf="estApplicationExistante(application.statut)"
+        [routerLink]="['/dictionnaire/documenter']"
+        [queryParams]="{ mode: 'ia', application: application.code }"
+      >
+        Documenter avec l'IA
+      </a>
+      <a
+        *ngIf="application.statut === 'EN_CONCEPTION'"
+        [routerLink]="['/dictionnaire/documenter']"
+        [queryParams]="{ mode: 'formulaire', application: application.code }"
+      >
+        Continuer la saisie
+      </a>
+    </p>
+
+    <h3>Objets documentés ({{ objets.length }})</h3>
+
+    <p *ngIf="objets.length === 0">
+      Aucun objet n'est encore documenté pour cette application.
+    </p>
+
+    <table *ngIf="objets.length > 0">
+      <thead>
+        <tr>
+          <th>Objet</th>
+          <th>Schéma</th>
+          <th>Type</th>
+          <th>Statut Oracle</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let obj of objets">
+          <td>
+            <a routerLink="/dictionnaire/ancien">{{ obj.schema }}.{{ obj.nom }}</a>
+          </td>
+          <td>{{ obj.schema }}</td>
+          <td>{{ obj.type === 'VIEW' ? 'Vue' : 'Table' }}</td>
+          <td>{{ libelleStatutObjet(obj.statut) }}</td>
+          <td>{{ obj.description || '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </ng-container>
+</section>
