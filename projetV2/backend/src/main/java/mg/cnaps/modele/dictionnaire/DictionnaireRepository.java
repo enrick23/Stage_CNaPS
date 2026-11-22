@@ -11,6 +11,12 @@ import mg.cnaps.modele.dictionnaire.DictionnaireDTO.Relation;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.Sequence;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.Trigger;
 
+import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ApplicationCatalogue;
+import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ObjetCatalogue;
+import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ReponseCatalogue;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.SqlParameterValue;
@@ -45,10 +51,14 @@ public class DictionnaireRepository {
     /** Filtre optionnel sur le nom d'objet : (? IS NULL OR col = ?). */
     private static final String FILTRE_NOM = " AND (? IS NULL OR %s = ?) ";
 
-    private final JdbcTemplate jdbc;
+    private static final Logger LOG = LoggerFactory.getLogger(DictionnaireRepository.class);
 
-    public DictionnaireRepository(JdbcTemplate jdbc) {
+    private final JdbcTemplate jdbc;
+    private final ReferentielApplicationsConfig referentielConfig;
+
+    public DictionnaireRepository(JdbcTemplate jdbc, ReferentielApplicationsConfig referentielConfig) {
         this.jdbc = jdbc;
+        this.referentielConfig = referentielConfig;
     }
 
     // ------------------------------------------------------------------ Enregistrement (IAM.DICO_DATA_*)
@@ -310,6 +320,79 @@ public class DictionnaireRepository {
                 .filter(a -> c.equalsIgnoreCase(a.code))
                 .findFirst()
                 .orElse(null);
+    }
+
+    // ------------------------------------------------------------------ Catalogue unique (T4)
+
+    /**
+     * Catalogue unique : référentiel officiel + applications documentées, avec statut calculé.
+     * La logique de fusion est dans CatalogueCalculateur (pure, testée sans base).
+     *
+     * @param statutFiltre statut déjà validé par le contrôleur, ou null
+     * @throws IllegalStateException si la configuration du référentiel est invalide (message explicite)
+     */
+    public ReponseCatalogue applicationsCatalogue(String statutFiltre) {
+        // Lève IllegalStateException si table/colonnes configurées sont dangereuses : volontairement non rattrapé.
+        String sqlReferentiel = referentielConfig.requete();
+
+        Map<String, String> referentiel = new LinkedHashMap<>();
+        boolean referentielDisponible = true;
+        try {
+            // À VALIDER avec la base (RJ45) : table, colonnes et droit SELECT de DEV_DEPL sur la source du référentiel.
+            jdbc.query(sqlReferentiel, rs -> {
+                String code = CatalogueCalculateur.normaliserCode(rs.getString(1));
+                if (code == null) return;
+                String libelle = rs.getString(2);
+                referentiel.merge(code, libelle == null ? "" : libelle.trim(),
+                        (ancien, nouveau) -> ancien.isEmpty() ? nouveau : ancien);
+            });
+        } catch (DataAccessException e) {
+            LOG.warn("Référentiel des applications illisible ({}) : catalogue calculé avec un référentiel vide. Cause : {}",
+                    sqlReferentiel, e.getMessage());
+            referentiel.clear();
+            referentielDisponible = false;
+        }
+
+        Set<String> existantsOracle = objetsExistantsOracle();
+        List<ApplicationCatalogue> applications = CatalogueCalculateur.fusionner(
+                referentiel, applications(), objets(null, null, null), existantsOracle, statutFiltre);
+        return new ReponseCatalogue(referentielDisponible, existantsOracle != null, applications);
+    }
+
+    /** Objets documentés d'une application, avec leur statut CREE / NON_CREE. */
+    public List<ObjetCatalogue> objetsCatalogue(String codeApplication) {
+        Set<String> existantsOracle = objetsExistantsOracle();
+        List<ObjetCatalogue> resultat = new ArrayList<>();
+        // Le code reste un paramètre lié dans objets() : jamais concaténé au SQL.
+        for (Objet o : objets(null, null, codeApplication)) {
+            resultat.add(CatalogueCalculateur.versObjetCatalogue(o, existantsOracle));
+        }
+        return resultat;
+    }
+
+    /**
+     * Clés SCHEMA.NOM des objets documentés qui existent réellement dans Oracle. Une seule requête
+     * ensembliste (pas une requête par objet). Même critère que le badge « ORACLE OK »
+     * (CatalogueOracle.croiser : ALL_OBJECTS, owner + object_name, types TABLE/VIEW).
+     * Retourne null si ALL_OBJECTS est illisible (l'appelant compte alors 0 objet créé).
+     * SQL constant : aucune valeur externe.
+     */
+    private Set<String> objetsExistantsOracle() {
+        try {
+            // À VALIDER avec la base (RJ45) : visibilité de ALL_OBJECTS pour DEV_DEPL sur les schémas métier
+            // (ALL_OBJECTS ne montre que les objets sur lesquels DEV_DEPL a un privilège).
+            return new LinkedHashSet<>(jdbc.query(
+                    "SELECT UPPER(TRIM(t.SCHEMAS)), UPPER(TRIM(t.NOM_TABLE)) "
+                  + "  FROM IAM.DICO_DATA_TABLE t "
+                  + " WHERE EXISTS (SELECT 1 FROM all_objects o "
+                  + "                WHERE o.owner = UPPER(TRIM(t.SCHEMAS)) "
+                  + "                  AND o.object_name = UPPER(TRIM(t.NOM_TABLE)) "
+                  + "                  AND o.object_type IN ('TABLE','VIEW'))",
+                    (rs, i) -> CatalogueCalculateur.cleObjet(rs.getString(1), rs.getString(2))));
+        } catch (DataAccessException e) {
+            LOG.warn("Catalogue Oracle (ALL_OBJECTS) illisible : nbObjetsCrees = 0. Cause : {}", e.getMessage());
+            return null;
+        }
     }
 
     /** Tous les schémas présents dans la base Oracle (ALL_USERS) et déclarés dans IAM.DICO_DATA_TABLE. */

@@ -182,4 +182,63 @@ public final class DictionnaireDTO {
         public String index;
         public String observation;
     }
+
+    // ------------------------------------------------------------------ Catalogue unique (T4)
+    // Alignés sur models/catalogue.model.ts (frontend).
+
+    /** Application du catalogue unique. statut : EXISTANTE_NON_DOCUMENTEE | EXISTANTE_DOCUMENTEE | EN_CONCEPTION. */
+    public static class ApplicationCatalogue {
+        public String code;
+        public String libelle;
+        public String statut;
+        public List<String> schemas;
+        public int nbObjets;
+        public int nbObjetsCrees;
+
+        public ApplicationCatalogue(String code, String libelle, String statut,
+                                    List<String> schemas, int nbObjets, int nbObjetsCrees) {
+            this.code = code;
+            this.libelle = libelle;
+            this.statut = statut;
+            this.schemas = schemas;
+            this.nbObjets = nbObjets;
+            this.nbObjetsCrees = nbObjetsCrees;
+        }
+    }
+
+    /** Objet d'une application. type : TABLE | VIEW ; statut : CREE | NON_CREE (présent ou non dans Oracle). */
+    public static class ObjetCatalogue {
+        public String schema;
+        public String nom;
+        public String type;
+        public String statut;
+        public String description;
+
+        public ObjetCatalogue(String schema, String nom, String type, String statut, String description) {
+            this.schema = schema;
+            this.nom = nom;
+            this.type = type;
+            this.statut = statut;
+            this.description = description;
+        }
+    }
+
+    /**
+     * Enveloppe de réponse du catalogue. Le frontend (catalogue.service.ts) la reconnaît déjà.
+     * referentielDisponible=false : le référentiel officiel est illisible, donc aucune application
+     * n'est EXISTANTE_* et les applications documentées apparaissent toutes « EN_CONCEPTION ».
+     * catalogueOracleDisponible=false : ALL_OBJECTS illisible, donc nbObjetsCrees vaut 0 partout.
+     */
+    public static class ReponseCatalogue {
+        public boolean referentielDisponible;
+        public boolean catalogueOracleDisponible;
+        public List<ApplicationCatalogue> applications;
+
+        public ReponseCatalogue(boolean referentielDisponible, boolean catalogueOracleDisponible,
+                                List<ApplicationCatalogue> applications) {
+            this.referentielDisponible = referentielDisponible;
+            this.catalogueOracleDisponible = catalogueOracleDisponible;
+            this.applications = applications;
+        }
+    }
 }

@@ -5,6 +5,8 @@ import mg.cnaps.modele.dictionnaire.DictionnaireDTO.DetailObjet;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.FicheApplication;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.FormulaireObjet;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.Objet;
+import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ObjetCatalogue;
+import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ReponseCatalogue;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ContentDisposition;
@@ -73,6 +75,26 @@ public class DictionnaireController {
         FicheApplication f = new FicheApplication();
         f.application = app;
         return ResponseEntity.ok(f);
+    }
+
+    /** Catalogue unique (applications existantes + en conception). Voir CatalogueCalculateur pour les statuts. */
+    @GetMapping("/catalogue/applications")
+    public ReponseCatalogue catalogueApplications(@RequestParam(required = false) String statut) {
+        String s = statut == null || statut.trim().isEmpty() ? null : statut.trim().toUpperCase(Locale.ROOT);
+        // Le statut n'est jamais utilisé dans le SQL : il sert seulement de filtre en mémoire, après validation.
+        if (s != null && !CatalogueCalculateur.estStatutValide(s)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Statut inconnu (valeurs : EXISTANTE_NON_DOCUMENTEE, EXISTANTE_DOCUMENTEE, EN_CONCEPTION)");
+        }
+        return repository.applicationsCatalogue(s);
+    }
+
+    @GetMapping("/catalogue/applications/{code}/objets")
+    public List<ObjetCatalogue> catalogueObjets(@PathVariable String code) {
+        if (code == null || code.trim().isEmpty() || code.length() > 150) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Code application invalide");
+        }
+        return repository.objetsCatalogue(code.trim());
     }
 
     @GetMapping("/schemas")
