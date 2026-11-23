@@ -104,15 +104,15 @@ public class CatalogueCalculateurTest {
     @Test
     public void filtreParStatut() {
         Map<String, String> ref = new LinkedHashMap<>();
-        ref.put("A", "A");
-        ref.put("B", "B");
-        List<Objet> objets = Collections.singletonList(objet("A", "DRH", "T1"));
+        ref.put("APP1", "APP1");
+        ref.put("APP2", "APP2");
+        List<Objet> objets = Collections.singletonList(objet("APP1", "DRH", "T1"));
 
         List<ApplicationCatalogue> res = CatalogueCalculateur.fusionner(
                 ref, new ArrayList<Application>(), objets, new HashSet<>(), "EXISTANTE_NON_DOCUMENTEE");
 
         assertEquals(1, res.size());
-        assertEquals("B", res.get(0).code);
+        assertEquals("APP2", res.get(0).code);
     }
 
     @Test
@@ -213,6 +213,27 @@ public class CatalogueCalculateurTest {
         assertEquals("EN_CONCEPTION", res.get(0).statut);
         assertEquals(uuid, res.get(0).code);
         assertEquals("Gestion des Prêts et Avances", res.get(0).libelle);
+    }
+
+    @Test
+    public void codesParasitesDuReferentielSontEcartes() {
+        assertFalse(CatalogueCalculateur.estCodeReferentielExploitable(null));
+        assertFalse(CatalogueCalculateur.estCodeReferentielExploitable(""));
+        assertFalse(CatalogueCalculateur.estCodeReferentielExploitable("A"));
+        assertFalse(CatalogueCalculateur.estCodeReferentielExploitable("-"));
+        assertFalse(CatalogueCalculateur.estCodeReferentielExploitable("--"));
+        assertTrue(CatalogueCalculateur.estCodeReferentielExploitable("TT"));
+        assertTrue(CatalogueCalculateur.estCodeReferentielExploitable("31006"));
+        assertTrue(CatalogueCalculateur.estCodeReferentielExploitable("-A"));
+
+        Map<String, String> ref = new LinkedHashMap<>();
+        ref.put("-", "-");
+        ref.put("a", "A");
+        ref.put("MAN10", "RECEPTION ET TRANSMISSION DOSSIER");
+        List<ApplicationCatalogue> res = CatalogueCalculateur.fusionner(
+                ref, new ArrayList<>(), new ArrayList<>(), new HashSet<>(), null);
+        assertEquals(1, res.size());
+        assertEquals("MAN10", res.get(0).code);
     }
 
     @Test

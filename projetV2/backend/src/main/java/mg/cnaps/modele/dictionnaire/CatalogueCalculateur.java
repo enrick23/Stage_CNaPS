@@ -53,6 +53,19 @@ public final class CatalogueCalculateur {
         return c.isEmpty() ? null : c;
     }
 
+    /**
+     * Un code du référentiel est exploitable s'il compte au moins 2 caractères dont au moins une lettre ou un
+     * chiffre. Écarte les valeurs parasites de CPT_MENU (« - », « A »). Appliqué au référentiel officiel
+     * uniquement : un objet déjà documenté n'est jamais masqué par ce filtre.
+     */
+    public static boolean estCodeReferentielExploitable(String codeNormalise) {
+        if (codeNormalise == null || codeNormalise.length() < 2) return false;
+        for (int i = 0; i < codeNormalise.length(); i++) {
+            if (Character.isLetterOrDigit(codeNormalise.charAt(i))) return true;
+        }
+        return false;
+    }
+
     /** Code d'application au catalogue : APP_CODE_REF s'il est renseigné, sinon APP_ID (normalisés). Null si aucun. */
     public static String codeEffectif(Objet o) {
         String ref = normaliserCode(o.appCodeRef);
@@ -89,7 +102,7 @@ public final class CatalogueCalculateur {
         Map<String, String> libellesRef = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : referentiel.entrySet()) {
             String code = normaliserCode(e.getKey());
-            if (code == null) continue;
+            if (!estCodeReferentielExploitable(code)) continue;
             String lib = e.getValue() == null ? "" : e.getValue().trim();
             libellesRef.merge(code, lib, (ancien, nouveau) -> ancien.isEmpty() ? nouveau : ancien);
         }
