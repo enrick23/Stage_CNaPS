@@ -119,6 +119,8 @@ export interface DicoFormulaireColonne {
 
 export interface DicoFormulaireObjet {
   appCode?: string;
+  /** Code de référence pour une application existante ; absent pour une application en conception. */
+  appCodeRef?: string;
   appLibelle?: string;
   appDescription?: string;
   schema: string;

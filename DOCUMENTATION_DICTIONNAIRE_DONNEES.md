@@ -407,7 +407,8 @@ Si une mise à jour ne fournit pas `appCodeRef`, `APP_CODE_REF` n'est pas détac
 | `/dictionnaire/catalogue?statut=&q=&page=` | Catalogue : recherche, filtres par statut avec compteurs, pagination compacte (25 lignes par page). L'état est conservé dans l'URL. |
 | `/dictionnaire/catalogue/:application` | Fiche application et liste de ses objets. |
 | `/dictionnaire/catalogue/:application/:schema/:objet?onglet=` | Fiche d'un objet. `onglet` = `colonnes`, `triggers`, `index`, `relations` ou `script` (absent ou invalide : `colonnes`). |
-| `/dictionnaire/documenter?mode=ia\|formulaire&application=CODE` | Point d'entrée de la documentation (contenu à venir). |
+| `/dictionnaire/documenter?mode=ia&application=CODE` | Documente une application existante : analyse de fichiers ou de code source, enrichissement depuis Oracle, relecture des objets proposés puis enregistrement par lot avec validation du code de référentiel. |
+| `/dictionnaire/documenter?mode=formulaire&application=APP_ID` | Conçoit une nouvelle application en quatre étapes et documente une table ou une vue. L'application est créée à la première sauvegarde ; son `APP_ID` est ensuite réutilisé. Sans `application`, le formulaire démarre une nouvelle application. |
 | `/dictionnaire/export` | Export (contenu à venir). |
 | `/dictionnaire/ancien` | Ancienne page, conservée telle quelle. |
 

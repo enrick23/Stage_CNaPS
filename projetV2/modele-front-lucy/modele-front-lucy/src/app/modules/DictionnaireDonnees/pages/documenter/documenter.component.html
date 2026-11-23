@@ -1,5 +1,441 @@
-<h2>Documenter</h2>
-<p>Page de documentation d'une application (en construction).</p>
-<p>Mode : {{ mode === 'ia' ? 'Assistant IA' : 'Formulaire' }}</p>
-<p *ngIf="application">Application : {{ application }}</p>
-<p *ngIf="!application">Nouvelle application</p>
+<section class="documenter-page">
+  <nav class="breadcrumb" aria-label="Fil d'Ariane">
+    <a routerLink="/dictionnaire/catalogue">Catalogue</a>
+    <span aria-hidden="true">/</span>
+    <span>Documenter</span>
+  </nav>
+
+  <header class="page-heading">
+    <div>
+      <p class="eyebrow">Dictionnaire de données</p>
+      <h1>Documenter une application</h1>
+      <p class="page-intro">
+        L'assistant IA aide à documenter une application déjà utilisée. Le formulaire sert à concevoir une nouvelle application avant sa création.
+      </p>
+    </div>
+    <a class="button-secondary" routerLink="/dictionnaire/catalogue">Retour au catalogue</a>
+  </header>
+
+  <nav class="mode-tabs" aria-label="Choisir le parcours de documentation">
+    <button type="button" [class.active]="mode === 'ia'" (click)="choisirMode('ia')">
+      <span class="mode-number">01</span>
+      <span>
+        <strong>Application existante</strong>
+        <small>Documenter avec l'IA</small>
+      </span>
+    </button>
+    <button type="button" [class.active]="mode === 'formulaire'" (click)="choisirMode('formulaire')">
+      <span class="mode-number">02</span>
+      <span>
+        <strong>Nouvelle application</strong>
+        <small>Concevoir en 4 étapes</small>
+      </span>
+    </button>
+  </nav>
+
+  <p class="notice notice-error" *ngIf="erreurAction" role="alert">{{ erreurAction }}</p>
+  <p class="notice notice-success" *ngIf="succesMessage" role="status">{{ succesMessage }}</p>
+
+  <ng-container *ngIf="mode === 'ia'">
+    <section class="ia-intro-card">
+      <div>
+        <p class="eyebrow">Parcours des applications existantes</p>
+        <h2>Analyser puis vérifier les objets proposés</h2>
+        <p>
+          Choisis une application présente dans le référentiel, analyse ses sources ou enrichis un objet Oracle,
+          puis sélectionne les objets à enregistrer.
+        </p>
+      </div>
+      <span class="engine-badge" *ngIf="statutIa">
+        {{ statutIa.fournisseur === 'expert' ? 'Moteur expert local' : (statutIa.modele || statutIa.fournisseur) }}
+      </span>
+    </section>
+
+    <p class="notice notice-warning" *ngIf="!referentielDisponible && !catalogueEnChargement" role="status">
+      Le référentiel est indisponible. Le rattachement et l'enregistrement de propositions IA sont désactivés.
+    </p>
+    <p class="notice notice-info" *ngIf="!statutIa" role="status">
+      L'état du moteur IA n'a pas pu être déterminé. Les modes d'analyse restent disponibles si le service répond.
+    </p>
+    <p class="notice notice-info" *ngIf="statutIa && statutIa.llmActif && statutIa.envoiCodeAutorise" role="status">
+      Le code source pourra être transmis au fournisseur IA configuré. N'envoie que des sources autorisées.
+    </p>
+
+    <div class="application-picker card">
+      <label for="application-existante">Application à documenter</label>
+      <select
+        id="application-existante"
+        [ngModel]="codeApplicationRef"
+        [ngModelOptions]="{ standalone: true }"
+        (ngModelChange)="choisirApplicationIa($event)"
+        [disabled]="catalogueEnChargement || !referentielDisponible"
+      >
+        <option value="">Sélectionner une application existante…</option>
+        <option *ngFor="let app of applicationsExistantes" [value]="app.code">
+          {{ app.libelle }} ({{ app.code }})
+        </option>
+      </select>
+      <p class="field-help" *ngIf="catalogueEnChargement">Chargement du référentiel…</p>
+      <p class="field-error" *ngIf="erreurCatalogue">{{ erreurCatalogue }}</p>
+      <p class="field-help" *ngIf="!catalogueEnChargement && referentielDisponible && !applicationsExistantes.length">
+        Aucune application existante n'est disponible dans le catalogue.
+      </p>
+      <p class="field-help" *ngIf="applicationIaSelectionnee">
+        Statut : {{ applicationIaSelectionnee.statut === 'EXISTANTE_DOCUMENTEE' ? 'déjà documentée' : 'à documenter' }}
+      </p>
+    </div>
+
+    <ng-container *ngIf="applicationIaSelectionnee">
+      <div class="ia-layout">
+        <section class="ia-input-card card">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Source de l'analyse</p>
+              <h2>Choisir une méthode</h2>
+            </div>
+          </div>
+
+          <div class="ia-tabs" role="tablist" aria-label="Méthode d'analyse">
+            <button type="button" role="tab" [attr.aria-selected]="modeSaisieIa === 'fichiers'"
+              [class.active]="modeSaisieIa === 'fichiers'" (click)="changerModeSaisieIa('fichiers')">
+              Fichiers
+            </button>
+            <button type="button" role="tab" [attr.aria-selected]="modeSaisieIa === 'code'"
+              [class.active]="modeSaisieIa === 'code'" (click)="changerModeSaisieIa('code')">
+              Code source
+            </button>
+            <button type="button" role="tab" [attr.aria-selected]="modeSaisieIa === 'oracle'"
+              [class.active]="modeSaisieIa === 'oracle'" (click)="changerModeSaisieIa('oracle')">
+              Objet Oracle
+            </button>
+          </div>
+
+          <div class="ia-form" *ngIf="modeSaisieIa === 'fichiers'">
+            <p class="field-help">Fichiers Java, SQL, PL/SQL ou archive ZIP (15 Mo maximum par fichier).</p>
+            <input id="fichiers-sources" class="file-input" type="file" multiple
+              accept=".java,.sql,.pls,.pks,.pkb,.trg,.ddl,.txt,.zip" (change)="selectionnerFichiers($event)" />
+            <label class="button-secondary file-button" for="fichiers-sources">Parcourir les fichiers</label>
+            <ul class="file-list" *ngIf="fichiersSelectionnes.length">
+              <li *ngFor="let fichier of fichiersSelectionnes; let i = index">
+                <span>{{ fichier.name }} <small>({{ (fichier.size / 1024).toFixed(1) }} Ko)</small></span>
+                <button type="button" class="icon-button" (click)="retirerFichier(i)" [attr.aria-label]="'Retirer ' + fichier.name">
+                  Retirer
+                </button>
+              </li>
+            </ul>
+            <button type="button" class="button-primary" [disabled]="chargementIa || !fichiersSelectionnes.length"
+              (click)="lancerAnalyseFichiers()">
+              {{ chargementIa ? 'Analyse en cours…' : 'Analyser les fichiers' }}
+            </button>
+          </div>
+
+          <div class="ia-form" *ngIf="modeSaisieIa === 'code'">
+            <label for="nom-fichier-code">Nom du fichier</label>
+            <input id="nom-fichier-code" type="text" [(ngModel)]="nomFichierCode"
+              [ngModelOptions]="{ standalone: true }" placeholder="Ex. DemandePret.java" />
+            <label for="code-source">Code Java, SQL ou PL/SQL</label>
+            <textarea id="code-source" rows="12" [(ngModel)]="codeSource"
+              [ngModelOptions]="{ standalone: true }"
+              placeholder="Colle ici le code source autorisé à l'analyse."></textarea>
+            <button type="button" class="button-primary" [disabled]="chargementIa || !codeSource.trim()"
+              (click)="lancerAnalyseCode()">
+              {{ chargementIa ? 'Analyse en cours…' : 'Analyser le code source' }}
+            </button>
+          </div>
+
+          <div class="ia-form" *ngIf="modeSaisieIa === 'oracle'">
+            <label for="schema-oracle">Schéma Oracle</label>
+            <select id="schema-oracle" [(ngModel)]="schemaOracle" [ngModelOptions]="{ standalone: true }"
+              [disabled]="schemasEnChargement || !schemas.length">
+              <option value="">Sélectionner un schéma…</option>
+              <option *ngFor="let schema of schemas" [value]="schema">{{ schema }}</option>
+            </select>
+            <p class="field-error" *ngIf="erreurSchemas">{{ erreurSchemas }}</p>
+            <label for="nom-objet-oracle">Nom de la table ou vue</label>
+            <input id="nom-objet-oracle" type="text" [(ngModel)]="nomObjetOracle"
+              [ngModelOptions]="{ standalone: true }" placeholder="Ex. DEMANDE_PRET" />
+            <button type="button" class="button-primary"
+              [disabled]="chargementIa || !schemaOracle || !nomObjetOracle.trim()"
+              (click)="lancerEnrichissementOracle()">
+              {{ chargementIa ? 'Analyse en cours…' : 'Enrichir depuis Oracle' }}
+            </button>
+          </div>
+        </section>
+
+        <section class="analysis-results card" aria-live="polite">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Relecture humaine</p>
+              <h2>Objets proposés</h2>
+            </div>
+            <span class="count-badge" *ngIf="analyseResultat">{{ analyseResultat.objets.length }}</span>
+          </div>
+
+          <div class="loading-state" *ngIf="chargementIa" role="status">
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <span>Analyse des métadonnées en cours…</span>
+          </div>
+          <div class="empty-state" *ngIf="!chargementIa && !analyseResultat">
+            Lance une analyse pour afficher ici les objets et colonnes détectés.
+          </div>
+          <div class="empty-state" *ngIf="!chargementIa && analyseResultat && !analyseResultat.objets.length">
+            Aucun objet n'a été détecté. Vérifie le schéma et la source fournie.
+          </div>
+
+          <ng-container *ngIf="!chargementIa && analyseResultat">
+            <div class="analysis-meta">
+              <span>{{ analyseResultat.moteur }}</span>
+              <span>{{ analyseResultat.fichiersAnalyses }} fichier(s) analysé(s)</span>
+              <span>{{ analyseResultat.dureeMs }} ms</span>
+            </div>
+            <div class="analysis-warnings notice notice-warning" *ngIf="analyseResultat.avertissements.length">
+              <strong>À vérifier</strong>
+              <ul>
+                <li *ngFor="let avertissement of analyseResultat.avertissements">{{ avertissement }}</li>
+              </ul>
+            </div>
+
+            <div class="selection-actions" *ngIf="analyseResultat.objets.length">
+              <span>{{ nombreObjetsSelectionnes }} objet(s) sélectionné(s)</span>
+              <div>
+                <button type="button" class="text-button" (click)="selectionnerTousLesObjets()">Tout sélectionner</button>
+                <button type="button" class="text-button" (click)="deselectionnerTousLesObjets()">Tout désélectionner</button>
+              </div>
+            </div>
+
+            <div class="proposed-list">
+              <article class="proposed-card" *ngFor="let propose of analyseResultat.objets">
+                <div class="proposed-heading">
+                  <label class="selection-label">
+                    <input type="checkbox" [checked]="objetsSelectionnes.has(propose)"
+                      (change)="basculerSelectionObjet(propose, $event)" />
+                    <span>
+                      <strong>{{ propose.formulaire.schema }}.{{ propose.formulaire.nomObjet }}</strong>
+                      <small>{{ propose.formulaire.typeObjet === 'VIEW' ? 'Vue' : 'Table' }} · {{ propose.nombreColonnes }} colonne(s)</small>
+                    </span>
+                  </label>
+                  <div class="object-badges">
+                    <span class="badge badge-created" *ngIf="propose.existeEnBase">Présent dans Oracle</span>
+                    <span class="badge badge-pending" *ngIf="!propose.existeEnBase">À créer dans Oracle</span>
+                    <span class="badge badge-documented" *ngIf="propose.dejaDocumente">Déjà documenté</span>
+                    <span class="badge badge-reference" *ngIf="propose.formulaire.flagRef">Référentiel</span>
+                  </div>
+                </div>
+                <p class="object-description">{{ propose.formulaire.description || 'Aucune description fonctionnelle proposée.' }}</p>
+                <div class="completeness">
+                  <span>Complétude des descriptions</span>
+                  <progress [value]="propose.completude" max="100"
+                    [attr.aria-label]="'Complétude : ' + propose.completude + ' pour cent'"></progress>
+                  <strong>{{ propose.completude }} %</strong>
+                </div>
+                <details>
+                  <summary>Voir les colonnes, sources et alertes</summary>
+                  <div class="column-preview" *ngIf="propose.formulaire.colonnes.length">
+                    <div *ngFor="let colonne of propose.formulaire.colonnes">
+                      <code>{{ colonne.nom }}</code>
+                      <span>{{ colonne.typeBase }}<ng-container *ngIf="colonne.taille">({{ colonne.taille }})</ng-container></span>
+                      <span>{{ colonne.description || 'Description à compléter' }}</span>
+                    </div>
+                  </div>
+                  <p class="field-help" *ngIf="propose.sources.length">Sources : {{ propose.sources.join(', ') }}</p>
+                  <ul class="object-alerts" *ngIf="propose.alertes.length">
+                    <li *ngFor="let alerte of propose.alertes">{{ alerte }}</li>
+                  </ul>
+                </details>
+              </article>
+            </div>
+
+            <footer class="save-bar" *ngIf="analyseResultat.objets.length">
+              <span>Les objets cochés seront enregistrés dans le dictionnaire, pas créés dans Oracle.</span>
+              <button type="button" class="button-primary"
+                [disabled]="enregistrementLotEnCours || !nombreObjetsSelectionnes || !referentielDisponible || lotEnregistre"
+                (click)="enregistrerObjetsSelectionnes()">
+                {{ enregistrementLotEnCours ? 'Enregistrement…' : (lotEnregistre ? 'Enregistré' : 'Enregistrer la sélection') }}
+              </button>
+            </footer>
+          </ng-container>
+        </section>
+      </div>
+    </ng-container>
+  </ng-container>
+
+  <ng-container *ngIf="mode === 'formulaire'">
+    <section class="form-intro-card">
+      <p class="eyebrow">Parcours de conception</p>
+      <h2>Documenter une nouvelle application avant sa création</h2>
+      <p>
+        L'identifiant de l'application sera généré au premier enregistrement. Chaque objet ajouté ensuite
+        réutilisera automatiquement ce même identifiant.
+      </p>
+    </section>
+
+    <p class="notice notice-error" *ngIf="erreurApplications" role="alert">{{ erreurApplications }}</p>
+    <p class="notice notice-error" *ngIf="codeApplicationConceptionIntrouvable" role="alert">
+      L'application « {{ application }} » n'a pas été trouvée parmi les applications en conception.
+      <button type="button" class="text-button" (click)="creerNouvelleApplication()">Démarrer une nouvelle application</button>
+    </p>
+
+    <form class="design-form" (ngSubmit)="enregistrerObjet()" novalidate>
+      <section class="step-card card">
+        <div class="step-heading">
+          <span class="step-number">01</span>
+          <div>
+            <h2>Application et schéma Oracle</h2>
+            <p>Définis le contexte de la nouvelle application.</p>
+          </div>
+          <button type="button" class="text-button reset-app" *ngIf="appCodeConception"
+            (click)="creerNouvelleApplication()">Nouvelle application</button>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="libelle-application">Nom de l'application <span aria-hidden="true">*</span></label>
+            <input id="libelle-application" type="text" name="appLibelle"
+              [(ngModel)]="appLibelleConception" [readonly]="!!appCodeConception"
+              placeholder="Ex. Gestion des prêts et avances" required />
+            <small class="field-help" *ngIf="appCodeConception">Cette application est déjà créée dans le dictionnaire.</small>
+          </div>
+          <div class="field">
+            <label for="schema-formulaire">Schéma Oracle propriétaire <span aria-hidden="true">*</span></label>
+            <select id="schema-formulaire" name="formSchema" [(ngModel)]="formSchema"
+              [disabled]="schemasEnChargement || !schemas.length" required>
+              <option value="">Sélectionner un schéma…</option>
+              <option *ngFor="let schema of schemas" [value]="schema">{{ schema }}</option>
+            </select>
+            <small class="field-error" *ngIf="erreurSchemas">{{ erreurSchemas }}</small>
+          </div>
+          <div class="field field-full">
+            <label for="description-application">Description fonctionnelle (facultative)</label>
+            <textarea id="description-application" name="appDescription" rows="3"
+              [(ngModel)]="appDescriptionConception" [readonly]="!!appCodeConception"
+              placeholder="Décris l'objectif fonctionnel de l'application."></textarea>
+            <small class="field-help">L'identifiant sera généré lors de la première sauvegarde de table ou de vue.</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-card card">
+        <div class="step-heading">
+          <span class="step-number">02</span>
+          <div>
+            <h2>Définition de l'objet</h2>
+            <p>Décris la table ou la vue à documenter.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <fieldset class="field field-full">
+            <legend>Type d'objet</legend>
+            <div class="choice-row">
+              <label><input type="radio" name="typeObjet" value="TABLE" [(ngModel)]="formTypeObjet" /> Table</label>
+              <label><input type="radio" name="typeObjet" value="VIEW" [(ngModel)]="formTypeObjet" /> Vue</label>
+            </div>
+            <label class="checkbox-choice" *ngIf="formTypeObjet === 'TABLE'">
+              <input type="checkbox" name="flagRef" [(ngModel)]="formFlagRef" />
+              Table référentielle
+            </label>
+          </fieldset>
+          <div class="field">
+            <label for="nom-objet">Nom de la table ou de la vue <span aria-hidden="true">*</span></label>
+            <input id="nom-objet" type="text" name="nomObjet" [(ngModel)]="formNomObjet"
+              placeholder="Ex. DEMANDE_PRET" required />
+          </div>
+          <div class="field field-full">
+            <label for="description-objet">Description fonctionnelle</label>
+            <textarea id="description-objet" name="descriptionObjet" rows="3"
+              [(ngModel)]="formDescription" placeholder="Décris les données et le rôle de cet objet."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-card card">
+        <div class="step-heading">
+          <span class="step-number">03</span>
+          <div>
+            <h2>Colonnes et attributs</h2>
+            <p>Renseigne au moins une colonne ; les autres attributs peuvent être complétés plus tard.</p>
+          </div>
+          <button type="button" class="button-secondary add-column" (click)="ajouterColonne()">Ajouter une colonne</button>
+        </div>
+        <div class="table-scroll">
+          <table class="columns-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Nom *</th><th>Type</th><th>Taille</th><th>Contrainte</th>
+                <th>Sensibilité</th><th>Défaut</th><th>Description</th><th>Index</th><th>Observation</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let colonne of formColonnes; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td><input [name]="'colNom' + i" [(ngModel)]="colonne.nom" aria-label="Nom de colonne" required /></td>
+                <td>
+                  <select [name]="'colType' + i" [(ngModel)]="colonne.typeBase" aria-label="Type Oracle">
+                    <option *ngFor="let type of typesDisponibles" [value]="type">{{ type }}</option>
+                  </select>
+                </td>
+                <td><input [name]="'colTaille' + i" [(ngModel)]="colonne.taille" aria-label="Taille" /></td>
+                <td>
+                  <select [name]="'colContrainte' + i" [(ngModel)]="colonne.contrainte" aria-label="Contrainte">
+                    <option *ngFor="let contrainte of contraintesDisponibles" [value]="contrainte">{{ contrainte || 'Aucune' }}</option>
+                  </select>
+                </td>
+                <td>
+                  <select [name]="'colSensibilite' + i" [(ngModel)]="colonne.niveauSensibilite" aria-label="Sensibilité">
+                    <option *ngFor="let niveau of niveauxSensibilite" [ngValue]="niveau.valeur">{{ niveau.libelle }}</option>
+                  </select>
+                </td>
+                <td><input [name]="'colDefaut' + i" [(ngModel)]="colonne.defaut" aria-label="Valeur par défaut" /></td>
+                <td><input [name]="'colDescription' + i" [(ngModel)]="colonne.description" aria-label="Description de la colonne" /></td>
+                <td><input [name]="'colIndex' + i" [(ngModel)]="colonne.index" aria-label="Index" /></td>
+                <td><input [name]="'colObservation' + i" [(ngModel)]="colonne.observation" aria-label="Observation" /></td>
+                <td><button type="button" class="icon-button" [disabled]="formColonnes.length <= 1"
+                  (click)="supprimerColonne(i)" [attr.aria-label]="'Supprimer la colonne ' + (i + 1)">Retirer</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="step-card card">
+        <div class="step-heading">
+          <span class="step-number">04</span>
+          <div>
+            <h2>Séquences, triggers et script</h2>
+            <p>Ajoute les automatismes associés à cet objet.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="sequences">Séquence(s) associée(s)</label>
+            <input id="sequences" name="sequences" [(ngModel)]="formSequences" placeholder="Ex. DRH.SEQ_DEMANDE_PRET" />
+          </div>
+          <div class="field">
+            <label for="triggers">Triggers et descriptions</label>
+            <textarea id="triggers" name="triggers" rows="3" [(ngModel)]="formTriggers"
+              placeholder="Un trigger par ligne : NOM_TRIGGER : Description"></textarea>
+          </div>
+          <div class="field field-full" *ngIf="formTypeObjet === 'VIEW'">
+            <label for="view-script">Script SQL de la vue</label>
+            <textarea id="view-script" name="viewScript" rows="6" [(ngModel)]="formViewScript"
+              placeholder="CREATE OR REPLACE VIEW … AS SELECT …"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <footer class="form-actions">
+        <button type="button" class="button-secondary" routerLink="/dictionnaire/catalogue">Annuler</button>
+        <button type="submit" class="button-primary" [disabled]="enregistrementFormulaireEnCours || !!erreurSchemas">
+          {{ enregistrementFormulaireEnCours ? 'Enregistrement…' : 'Enregistrer cet objet' }}
+        </button>
+      </footer>
+    </form>
+
+    <div class="saved-application card" *ngIf="appCodeConception">
+      <div>
+        <strong>Application en conception</strong>
+        <span>{{ appLibelleConception }} · APP_ID : {{ appCodeConception }}</span>
+      </div>
+      <a class="button-secondary" [routerLink]="['/dictionnaire/catalogue', appCodeConception]">Voir la fiche application</a>
+      <button type="button" class="text-button" (click)="preparerAutreObjet()">Documenter un autre objet</button>
+    </div>
+  </ng-container>
+</section>
