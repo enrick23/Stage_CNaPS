@@ -6,6 +6,7 @@ import { environment } from '../../../../environments/environment';
 import {
   ApplicationCatalogue,
   ObjetCatalogue,
+  ReponseCatalogue,
   StatutApplication,
 } from '../models/catalogue.model';
 
@@ -13,12 +14,13 @@ import {
  * Interrupteur unique pour basculer entre les données factices (T3, hors-ligne)
  * et les vrais endpoints backend `/api/dictionnaire/catalogue/...` (T4).
  */
-export const UTILISER_DONNEES_FACTICES: boolean = true;
+export const UTILISER_DONNEES_FACTICES: boolean = false;
 
-/** Enveloppe optionnelle si le backend retourne referentielDisponible avec la liste (T4). */
-interface ReponseCatalogueApplications {
+/** Forme brute acceptée du backend : enveloppe (T4) ou, par tolérance, simple tableau. */
+interface ReponseBruteCatalogue {
   referentielDisponible?: boolean;
-  applications: ApplicationCatalogue[];
+  catalogueOracleDisponible?: boolean;
+  applications?: ApplicationCatalogue[];
 }
 
 /**
@@ -305,15 +307,28 @@ export class CatalogueService {
 
   /**
    * Liste les applications du catalogue unique, avec filtrage optionnel par statut.
-   * Si UTILISER_DONNEES_FACTICES = true, retourne les 30 applications factices via of(...).
-   * Sinon, appelle GET /api/dictionnaire/catalogue/applications.
+   * Ne retourne que le tableau ; pour connaître les drapeaux de fiabilité, utiliser obtenirCatalogue().
    */
   listerApplications(statut?: StatutApplication): Observable<ApplicationCatalogue[]> {
+    return this.obtenirCatalogue(statut).pipe(map((reponse) => reponse.applications));
+  }
+
+  /**
+   * Retourne la réponse complète du catalogue : applications et drapeaux
+   * referentielDisponible / catalogueOracleDisponible.
+   * Si UTILISER_DONNEES_FACTICES = true, retourne les 30 applications factices (drapeaux à true).
+   * Sinon, appelle GET /api/dictionnaire/catalogue/applications.
+   */
+  obtenirCatalogue(statut?: StatutApplication): Observable<ReponseCatalogue> {
     if (UTILISER_DONNEES_FACTICES) {
       const resultat = statut
         ? APPLICATIONS_FACTICES.filter((app) => app.statut === statut)
         : APPLICATIONS_FACTICES.slice();
-      return of(resultat);
+      return of({
+        referentielDisponible: true,
+        catalogueOracleDisponible: true,
+        applications: resultat,
+      });
     }
 
     let params = new HttpParams();
@@ -321,12 +336,22 @@ export class CatalogueService {
       params = params.set('statut', statut);
     }
     return this.http
-      .get<ApplicationCatalogue[] | ReponseCatalogueApplications>(
+      .get<ApplicationCatalogue[] | ReponseBruteCatalogue>(
         `${this.apiUrl}/catalogue/applications`,
         { params }
       )
       .pipe(
-        map((res) => (Array.isArray(res) ? res : res && res.applications ? res.applications : []))
+        map((res): ReponseCatalogue => {
+          if (Array.isArray(res)) {
+            return { referentielDisponible: true, catalogueOracleDisponible: true, applications: res };
+          }
+          return {
+            // Un drapeau absent n'est pas une alerte : seule la valeur false déclenche le message.
+            referentielDisponible: !res || res.referentielDisponible !== false,
+            catalogueOracleDisponible: !res || res.catalogueOracleDisponible !== false,
+            applications: res && res.applications ? res.applications : [],
+          };
+        })
       );
   }
 

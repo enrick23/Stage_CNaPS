@@ -41,7 +41,6 @@ export class DictionnaireDonneesComponent implements OnInit {
   formAppSearchTerm = '';
 
   fiche: DicoFicheApplication | null = null;
-  ongletDetail: 'colonnes' | 'triggers' | 'index' | 'relations' | 'script' = 'colonnes';
   exportEnCours = false;
   enregistrementEnCours = false;
 
@@ -991,7 +990,6 @@ public class DemandePret {
   selectObjet(objet: DicoObjet): void {
     this.selectedObjet = objet;
     this.detail = null;
-    this.ongletDetail = 'colonnes';
     this.chargementDetail = true;
     this.dico.detail(objet.schema, objet.nom).subscribe({
       next: (d) => {

@@ -32,7 +32,7 @@
       [class.active]="statutFiltre === 'EXISTANTE_DOCUMENTEE'"
       (click)="choisirStatut('EXISTANTE_DOCUMENTEE')"
     >
-      Existantes ({{ compteurExistantes }})
+      Existantes documentées ({{ compteurExistantes }})
     </button>
     <button
       type="button"
@@ -49,6 +49,13 @@
       Non documentées ({{ compteurNonDocumentees }})
     </button>
   </div>
+
+  <p *ngIf="!chargement && !erreur && !referentielDisponible">
+    Le référentiel officiel des applications est illisible : les statuts affichés ne sont pas fiables.
+  </p>
+  <p *ngIf="!chargement && !erreur && !catalogueOracleDisponible">
+    Le catalogue Oracle est indisponible : la colonne « Couverture » n'est pas fiable.
+  </p>
 
   <p *ngIf="chargement">Chargement du catalogue des applications…</p>
   <p *ngIf="erreur">{{ erreur }}</p>
@@ -113,14 +120,17 @@
         >
           Précédent
         </button>
-        <button
-          type="button"
-          *ngFor="let p of pagesDisponibles"
-          [class.active]="p === pageCourante"
-          (click)="allerAPage(p)"
-        >
-          {{ p }}
-        </button>
+        <ng-container *ngFor="let p of pagesAffichees">
+          <span *ngIf="p === null">…</span>
+          <button
+            type="button"
+            *ngIf="p !== null"
+            [class.active]="p === pageCourante"
+            (click)="allerAPage(p)"
+          >
+            {{ p }}
+          </button>
+        </ng-container>
         <button
           type="button"
           [disabled]="pageCourante >= totalPages"

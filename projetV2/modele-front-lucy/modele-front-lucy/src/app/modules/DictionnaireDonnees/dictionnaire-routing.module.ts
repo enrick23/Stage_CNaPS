@@ -2,7 +2,6 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { DictionnaireDonneesComponent } from './pages/dictionnaire-donnees/dictionnaire-donnees.component';
 import { DictionnaireShellComponent } from './pages/shell/dictionnaire-shell.component';
-import { AccueilComponent } from './pages/accueil/accueil.component';
 import { CatalogueComponent } from './pages/catalogue/catalogue.component';
 import { FicheApplicationComponent } from './pages/fiche-application/fiche-application.component';
 import { DocumenterComponent } from './pages/documenter/documenter.component';
@@ -13,7 +12,8 @@ const routes: Routes = [
     path: '',
     component: DictionnaireShellComponent,
     children: [
-      { path: '', component: AccueilComponent },
+      // Tant que l'accueil réel n'existe pas : AccueilComponent reste déclaré dans le module mais n'est pas routé.
+      { path: '', redirectTo: 'catalogue', pathMatch: 'full' },
       { path: 'catalogue', component: CatalogueComponent },
       { path: 'catalogue/:application', component: FicheApplicationComponent },
       // Paramètres de requête : mode = ia | formulaire, application = CODE

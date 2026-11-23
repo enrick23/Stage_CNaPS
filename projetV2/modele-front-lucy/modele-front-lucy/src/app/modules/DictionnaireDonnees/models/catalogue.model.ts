@@ -31,6 +31,17 @@ export interface ApplicationCatalogue {
   nbObjetsCrees: number;
 }
 
+/**
+ * Réponse complète de GET /api/dictionnaire/catalogue/applications :
+ * - referentielDisponible = false : le référentiel officiel est illisible, les statuts ne sont pas fiables ;
+ * - catalogueOracleDisponible = false : ALL_OBJECTS est illisible, la couverture (créés / documentés) n'est pas fiable.
+ */
+export interface ReponseCatalogue {
+  referentielDisponible: boolean;
+  catalogueOracleDisponible: boolean;
+  applications: ApplicationCatalogue[];
+}
+
 /** Objet (table ou vue) rattaché à une application dans la fiche application. */
 export interface ObjetCatalogue {
   schema: string;

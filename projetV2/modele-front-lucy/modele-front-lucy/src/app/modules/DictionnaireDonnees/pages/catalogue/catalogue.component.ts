@@ -30,6 +30,8 @@ export class CatalogueComponent implements OnInit, OnDestroy {
   applications: ApplicationCatalogue[] = [];
   chargement = false;
   erreur: string | null = null;
+  referentielDisponible = true;
+  catalogueOracleDisponible = true;
 
   statutFiltre: StatutApplication | '' = '';
   recherche = '';
@@ -69,9 +71,11 @@ export class CatalogueComponent implements OnInit, OnDestroy {
   chargerApplications(): void {
     this.chargement = true;
     this.erreur = null;
-    this.abonnementCatalogue = this.catalogueService.listerApplications().subscribe({
-      next: (apps) => {
-        this.applications = apps || [];
+    this.abonnementCatalogue = this.catalogueService.obtenirCatalogue().subscribe({
+      next: (reponse) => {
+        this.applications = reponse.applications || [];
+        this.referentielDisponible = reponse.referentielDisponible;
+        this.catalogueOracleDisponible = reponse.catalogueOracleDisponible;
         this.chargement = false;
         this.bornerPageCourante();
       },
@@ -120,12 +124,27 @@ export class CatalogueComponent implements OnInit, OnDestroy {
     return Math.max(1, Math.ceil(this.applicationsFiltrees.length / this.taillePage));
   }
 
-  get pagesDisponibles(): number[] {
-    const pages: number[] = [];
-    for (let i = 1; i <= this.totalPages; i++) {
-      pages.push(i);
+  /**
+   * Pagination compacte : première page, page courante et 2 voisines de chaque côté, dernière page.
+   * null = « … » (au moins une page masquée entre deux groupes).
+   */
+  get pagesAffichees(): Array<number | null> {
+    const total = this.totalPages;
+    const courante = Math.min(Math.max(1, this.pageCourante), total);
+    const retenues: number[] = [];
+    for (let p = 1; p <= total; p++) {
+      if (p === 1 || p === total || Math.abs(p - courante) <= 2) {
+        retenues.push(p);
+      }
     }
-    return pages;
+    const resultat: Array<number | null> = [];
+    retenues.forEach((p, i) => {
+      if (i > 0 && p - retenues[i - 1] > 1) {
+        resultat.push(null);
+      }
+      resultat.push(p);
+    });
+    return resultat;
   }
 
   get applicationsPaginees(): ApplicationCatalogue[] {
