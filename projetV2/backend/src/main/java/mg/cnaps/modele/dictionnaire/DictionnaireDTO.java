@@ -190,6 +190,11 @@ public final class DictionnaireDTO {
     // ------------------------------------------------------------------ Catalogue unique (T4)
     // Alignés sur models/catalogue.model.ts (frontend).
 
+    /** Demande de rattachement d'une application en conception à une entrée du référentiel officiel. */
+    public static class DemandeRattachementApplication {
+        public String appCodeRef;
+    }
+
     /** Application du catalogue unique. statut : EXISTANTE_NON_DOCUMENTEE | EXISTANTE_DOCUMENTEE | EN_CONCEPTION. */
     public static class ApplicationCatalogue {
         public String code;

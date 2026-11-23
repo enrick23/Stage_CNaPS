@@ -1,7 +1,10 @@
 package mg.cnaps.modele.dictionnaire;
 
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.AppIdFrequence;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.ApplicationCatalogueIntrouvableException;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.ApplicationNonEnConceptionException;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.CodeApplicationRefInconnuException;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.CodeRefDejaAssocieException;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.Reference;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.ReferentielIndisponibleException;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.ResolutionIdentite;
@@ -95,6 +98,51 @@ class ResolutionApplicationTest {
     }
 
     @Test
+    void valideLeRattachementSiLeCodeEstLibre() {
+        assertEquals("PAIE", ResolutionApplication.validerRattachementApplication(
+                "uuid-app-01", " paie ", 3, Collections.emptyList(), Collections.emptyList()));
+    }
+
+    @Test
+    void accepteUnRattachementDejaEffectuePourLeMemeAppId() {
+        assertEquals("PAIE", ResolutionApplication.validerRattachementApplication(
+                "uuid-app-01", "PAIE", 2,
+                Collections.singletonList("paie"), Collections.singletonList("UUID-APP-01")));
+    }
+
+    @Test
+    void refuseLeRattachementSiLeCodeEstDejaLieAUnAutreAppId() {
+        assertThrows(CodeRefDejaAssocieException.class, () ->
+                ResolutionApplication.validerRattachementApplication(
+                        "uuid-app-01", "PAIE", 2, Collections.emptyList(),
+                        Collections.singletonList("uuid-app-02")));
+    }
+
+    @Test
+    void refuseLeRattachementSiLeCodeEstLieSansAppId() {
+        assertThrows(CodeRefDejaAssocieException.class, () ->
+                ResolutionApplication.validerRattachementApplication(
+                        "uuid-app-01", "PAIE", 2, Collections.emptyList(),
+                        Collections.singletonList(null)));
+    }
+
+    @Test
+    void refuseLeRattachementSiLApplicationPorteDejaUnAutreCode() {
+        assertThrows(ApplicationNonEnConceptionException.class, () ->
+                ResolutionApplication.validerRattachementApplication(
+                        "uuid-app-01", "PAIE", 2, Collections.singletonList("SIG"),
+                        Collections.emptyList()));
+    }
+
+    @Test
+    void refuseLeRattachementSansObjetDocumente() {
+        assertThrows(ApplicationCatalogueIntrouvableException.class, () ->
+                ResolutionApplication.validerRattachementApplication(
+                        "uuid-app-01", "PAIE", 0, Collections.emptyList(),
+                        Collections.emptyList()));
+    }
+
+    @Test
     void erreursDeCodeEtDeReferentielOntLesStatutsHttpAttendus() {
         DictionnaireEcritureExceptionHandler handler = new DictionnaireEcritureExceptionHandler();
 
@@ -104,5 +152,13 @@ class ResolutionApplicationTest {
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE,
                 handler.referentielIndisponible(new ReferentielIndisponibleException("Référentiel illisible"))
                         .getStatusCode());
+        assertEquals(HttpStatus.CONFLICT,
+                handler.rattachementImpossible(new CodeRefDejaAssocieException("Conflit")).getStatusCode());
+        assertEquals(HttpStatus.CONFLICT,
+                handler.rattachementImpossible(
+                        new ApplicationNonEnConceptionException("Statut incompatible")).getStatusCode());
+        assertEquals(HttpStatus.NOT_FOUND,
+                handler.applicationIntrouvable(
+                        new ApplicationCatalogueIntrouvableException("Application inconnue")).getStatusCode());
     }
 }

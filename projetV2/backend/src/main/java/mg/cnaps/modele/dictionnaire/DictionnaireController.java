@@ -1,6 +1,7 @@
 package mg.cnaps.modele.dictionnaire;
 
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.Application;
+import mg.cnaps.modele.dictionnaire.DictionnaireDTO.DemandeRattachementApplication;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.DetailObjet;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.FicheApplication;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.FormulaireObjet;
@@ -95,6 +96,21 @@ public class DictionnaireController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Code application invalide");
         }
         return repository.objetsCatalogue(code.trim());
+    }
+
+    /** Rattache tous les objets d'un APP_ID en conception sans le fusionner avec une autre application. */
+    @PostMapping("/catalogue/applications/{appId}/rattachement")
+    public ResponseEntity<Integer> rattacherApplication(
+            @PathVariable String appId,
+            @RequestBody DemandeRattachementApplication demande) {
+        if (appId == null || appId.trim().isEmpty() || appId.length() > 150) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "APP_ID invalide");
+        }
+        if (demande == null || demande.appCodeRef == null || demande.appCodeRef.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Code de référentiel obligatoire");
+        }
+        int nombreObjets = repository.rattacherApplicationEnConception(appId, demande.appCodeRef);
+        return ResponseEntity.ok(nombreObjets);
     }
 
     @GetMapping("/schemas")

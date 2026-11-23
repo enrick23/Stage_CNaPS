@@ -386,12 +386,15 @@ Lors de l'enregistrement d'une application existante, `appCodeRef` est normalis�
 
 Si une mise à jour ne fournit pas `appCodeRef`, `APP_CODE_REF` n'est pas détaché : l'`UPDATE` conserve sa valeur avec `NVL`. Pour une nouvelle application, le champ est absent et la colonne reste `NULL`. Le backend détecte la colonne au vol (`ALL_TAB_COLUMNS`) ; un formulaire qui demande un rattachement est refusé si la colonne n'est pas disponible, tandis que les anciens formulaires sans `appCodeRef` conservent le comportement antérieur.
 
+Le passage d'une application `EN_CONCEPTION` à une application existante rattache tous les objets portant son `APP_ID` au code sélectionné, sans modifier l'`APP_ID` ni fusionner les objets. Le code cible doit être valide et libre ; s'il est déjà associé à un autre `APP_ID`, l'opération est refusée avec HTTP 409. Les références déjà présentes sur les objets de l'application doivent être vides ou identiques au code cible. Le rattachement se fait par `UPDATE` uniquement ; l'interface demande une confirmation explicite avant l'opération.
+
 ### 10.4. Endpoints
 
 | Méthode | Endpoint | Description |
 | :---: | :--- | :--- |
 | `GET` | `/api/dictionnaire/catalogue/applications[?statut=...]` | Réponse `{ referentielDisponible, catalogueOracleDisponible, applications: [...] }`. Chaque application : `code`, `libelle`, `statut`, `schemas`, `nbObjets`, `nbObjetsCrees`. Un statut inconnu renvoie `400`. |
 | `GET` | `/api/dictionnaire/catalogue/applications/{code}/objets` | Objets documentés d'une application : `schema`, `nom`, `type`, `statut` (`CREE` / `NON_CREE`), `description`. Le code est le code effectif (`APP_CODE_REF` sinon `APP_ID`). |
+| `POST` | `/api/dictionnaire/catalogue/applications/{appId}/rattachement` | Corps `{ "appCodeRef": "CODE" }` : rattache tous les objets d'une application en conception, conserve son `APP_ID`, renvoie le nombre d'objets. Code inconnu : `400` ; référentiel ou colonne indisponible : `503` ; application absente : `404` ; conflit d'identité : `409`. |
 | `POST` | `/api/dictionnaire/objets` | Enregistre un objet ; `appCodeRef` facultatif rattache une application existante après validation du référentiel. |
 | `POST` | `/api/dictionnaire/objets/lot` | Même règle `appCodeRef` pour chaque objet du lot. |
 
@@ -405,7 +408,7 @@ Si une mise à jour ne fournit pas `appCodeRef`, `APP_CODE_REF` n'est pas détac
 | :--- | :--- |
 | `/dictionnaire` | Redirige vers `/dictionnaire/catalogue` (l'accueil réel n'existe pas encore ; `AccueilComponent` reste déclaré). |
 | `/dictionnaire/catalogue?statut=&q=&page=` | Catalogue : recherche, filtres par statut avec compteurs, pagination compacte (25 lignes par page). L'état est conservé dans l'URL. |
-| `/dictionnaire/catalogue/:application` | Fiche application et liste de ses objets. |
+| `/dictionnaire/catalogue/:application` | Fiche application et liste de ses objets ; une application en conception peut être rattachée à un code libre du référentiel. |
 | `/dictionnaire/catalogue/:application/:schema/:objet?onglet=` | Fiche d'un objet. `onglet` = `colonnes`, `triggers`, `index`, `relations` ou `script` (absent ou invalide : `colonnes`). |
 | `/dictionnaire/documenter?mode=ia&application=CODE` | Documente une application existante : analyse de fichiers ou de code source, enrichissement depuis Oracle, relecture des objets proposés puis enregistrement par lot avec validation du code de référentiel. |
 | `/dictionnaire/documenter?mode=formulaire&application=APP_ID` | Conçoit une nouvelle application en quatre étapes et documente une table ou une vue. L'application est créée à la première sauvegarde ; son `APP_ID` est ensuite réutilisé. Sans `application`, le formulaire démarre une nouvelle application. |

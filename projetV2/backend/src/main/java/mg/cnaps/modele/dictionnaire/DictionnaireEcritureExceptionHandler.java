@@ -3,6 +3,10 @@ package mg.cnaps.modele.dictionnaire;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.CodeApplicationRefInconnuException;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.ColonneCodeRefIndisponibleException;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.ReferentielIndisponibleException;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.ApplicationCatalogueIntrouvableException;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.ApplicationNonEnConceptionException;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.CodeRefDejaAssocieException;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.RattachementConcurrentException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +33,20 @@ public class DictionnaireEcritureExceptionHandler {
     @ExceptionHandler(ColonneCodeRefIndisponibleException.class)
     public ResponseEntity<Map<String, String>> colonneCodeRefIndisponible(ColonneCodeRefIndisponibleException e) {
         return reponse(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+    }
+
+    @ExceptionHandler(ApplicationCatalogueIntrouvableException.class)
+    public ResponseEntity<Map<String, String>> applicationIntrouvable(ApplicationCatalogueIntrouvableException e) {
+        return reponse(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler({
+            ApplicationNonEnConceptionException.class,
+            CodeRefDejaAssocieException.class,
+            RattachementConcurrentException.class
+    })
+    public ResponseEntity<Map<String, String>> rattachementImpossible(IllegalStateException e) {
+        return reponse(HttpStatus.CONFLICT, e.getMessage());
     }
 
     private static ResponseEntity<Map<String, String>> reponse(HttpStatus statut, String message) {

@@ -23,6 +23,9 @@
       </span>
     </header>
 
+    <p class="notice notice-error" *ngIf="erreurRattachement" role="alert">{{ erreurRattachement }}</p>
+    <p class="notice notice-success" *ngIf="succesRattachement" role="status">{{ succesRattachement }}</p>
+
     <dl class="application-facts">
       <div>
         <dt>Code</dt>
@@ -67,6 +70,51 @@
         Continuer la saisie
       </a>
     </div>
+
+    <section class="promotion-card" *ngIf="application.statut === 'EN_CONCEPTION'">
+      <div>
+        <p class="eyebrow">Évolution du statut</p>
+        <h2>Cette application est maintenant au référentiel ?</h2>
+        <p>
+          Le rattachement s’applique à tous les objets documentés de cette application et conserve son APP_ID.
+          Il n’effectue aucune fusion avec une application déjà documentée.
+        </p>
+      </div>
+
+      <p class="notice notice-warning" *ngIf="!referentielDisponible" role="status">
+        Le référentiel est indisponible : le rattachement ne peut pas être effectué.
+      </p>
+      <form (ngSubmit)="rattacherAuReferentiel()">
+        <div class="promotion-fields">
+          <label for="code-reference-promotion">Application existante du référentiel</label>
+          <select
+            id="code-reference-promotion"
+            name="codeRefSelectionne"
+            [(ngModel)]="codeRefSelectionne"
+            (ngModelChange)="choisirCodeRef($event)"
+            [disabled]="!referentielDisponible || rattachementEnCours || !applicationsDisponibles.length"
+            required
+          >
+            <option value="">Sélectionner un code disponible…</option>
+            <option *ngFor="let app of applicationsDisponibles" [value]="app.code">
+              {{ app.libelle }} ({{ app.code }})
+            </option>
+          </select>
+        </div>
+        <p class="field-help" *ngIf="referentielDisponible && !applicationsDisponibles.length">
+          Aucun code non documenté n’est disponible. Un code déjà rattaché à une autre APP_ID ne peut pas être réutilisé.
+        </p>
+        <label class="promotion-confirmation">
+          <input type="checkbox" name="confirmerRattachement" [(ngModel)]="confirmerRattachement"
+            [disabled]="rattachementEnCours" />
+          Je confirme le rattachement de tous les objets, sans modifier leur APP_ID.
+        </label>
+        <button type="submit" class="button-primary"
+          [disabled]="!referentielDisponible || rattachementEnCours || !codeRefSelectionne || !confirmerRattachement">
+          {{ rattachementEnCours ? 'Rattachement…' : 'Passer l’application en existante' }}
+        </button>
+      </form>
+    </section>
 
     <div class="objects-heading">
       <h2>Objets documentés</h2>

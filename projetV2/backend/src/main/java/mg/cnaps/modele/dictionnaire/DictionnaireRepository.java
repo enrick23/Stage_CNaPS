@@ -17,6 +17,7 @@ import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ReponseCatalogue;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.AppIdFrequence;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.Reference;
 import mg.cnaps.modele.dictionnaire.ResolutionApplication.ResolutionIdentite;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.RattachementConcurrentException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -444,6 +445,52 @@ public class DictionnaireRepository {
                     "La configuration du référentiel des applications est invalide ; l'enregistrement est refusé.", e);
         }
         return lireReferentiel(sqlReferentiel);
+    }
+
+    /**
+     * Rattache tous les objets d'une application en conception à une entrée libre du référentiel.
+     * L'APP_ID est conservé ; aucun regroupement avec une application déjà identifiée n'est effectué.
+     */
+    @Transactional(readOnly = false)
+    public int rattacherApplicationEnConception(String appIdFourni, String appCodeRefFourni) {
+        if (!colonneCodeRefDisponible()) {
+            throw new ResolutionApplication.ColonneCodeRefIndisponibleException(
+                    "La colonne IAM.DICO_DATA_TABLE.APP_CODE_REF n'est pas disponible ; l'application ne peut pas être rattachée.");
+        }
+
+        String appId = CatalogueCalculateur.normaliserCode(appIdFourni);
+        if (appId == null) {
+            throw new IllegalArgumentException("Un APP_ID non vide est requis.");
+        }
+        Reference reference = ResolutionApplication.validerCodeRef(appCodeRefFourni, referentielPourEcriture());
+        Integer resultatComptage = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM IAM.DICO_DATA_TABLE WHERE UPPER(TRIM(APP_ID)) = ?",
+                Integer.class, appId);
+        int nombreObjets = resultatComptage == null ? 0 : resultatComptage;
+
+        List<String> codesDejaAffectes = jdbc.query(
+                "SELECT DISTINCT UPPER(TRIM(APP_CODE_REF)) FROM IAM.DICO_DATA_TABLE "
+              + "WHERE UPPER(TRIM(APP_ID)) = ? AND APP_CODE_REF IS NOT NULL",
+                (rs, i) -> rs.getString(1), appId);
+        List<String> idsAssociesAuCodeRef = jdbc.query(
+                "SELECT DISTINCT UPPER(TRIM(APP_ID)) FROM IAM.DICO_DATA_TABLE "
+              + "WHERE UPPER(TRIM(APP_CODE_REF)) = ?",
+                (rs, i) -> rs.getString(1), reference.code);
+
+        String codeRef = ResolutionApplication.validerRattachementApplication(
+                appId, reference.code, nombreObjets, codesDejaAffectes, idsAssociesAuCodeRef);
+        int objetsMisAJour = jdbc.update(
+                "UPDATE IAM.DICO_DATA_TABLE SET APP_CODE_REF = ? "
+              + "WHERE UPPER(TRIM(APP_ID)) = ? "
+              + "AND NOT EXISTS (SELECT 1 FROM IAM.DICO_DATA_TABLE autre "
+              + "WHERE UPPER(TRIM(autre.APP_CODE_REF)) = ? "
+              + "AND (autre.APP_ID IS NULL OR UPPER(TRIM(autre.APP_ID)) <> ?))",
+                codeRef, appId, codeRef, appId);
+        if (objetsMisAJour != nombreObjets) {
+            throw new RattachementConcurrentException(
+                    "Le rattachement a changé pendant l'opération ; recharge le catalogue avant de réessayer.");
+        }
+        return nombreObjets;
     }
 
     /** Objets documentés d'une application, avec leur statut CREE / NON_CREE. */

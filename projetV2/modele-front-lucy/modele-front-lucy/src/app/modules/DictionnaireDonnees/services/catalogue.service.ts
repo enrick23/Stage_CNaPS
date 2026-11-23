@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import {
@@ -399,6 +399,21 @@ export class CatalogueService {
 
     return this.http.get<ObjetCatalogue[]>(
       `${this.apiUrl}/catalogue/applications/${encodeURIComponent(codeNormalise)}/objets`
+    );
+  }
+
+  /**
+   * Rattache tous les objets d'une application en conception à une entrée libre du référentiel.
+   * La réponse est le nombre d'objets rattachés ; aucun appel d'écriture n'est émis en mode factice.
+   */
+  rattacherApplication(appId: string, appCodeRef: string): Observable<number> {
+    if (UTILISER_DONNEES_FACTICES) {
+      return throwError(new Error('Le rattachement n’est pas disponible avec le catalogue factice.'));
+    }
+
+    return this.http.post<number>(
+      `${this.apiUrl}/catalogue/applications/${encodeURIComponent((appId || '').trim())}/rattachement`,
+      { appCodeRef: (appCodeRef || '').trim().toUpperCase() }
     );
   }
 }

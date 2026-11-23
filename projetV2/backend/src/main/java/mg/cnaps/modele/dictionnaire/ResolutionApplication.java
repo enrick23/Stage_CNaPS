@@ -47,6 +47,48 @@ public final class ResolutionApplication {
         return reference.code;
     }
 
+    /**
+     * Valide le rattachement de tous les objets d'une application en conception sans fusionner les APP_ID.
+     * Une référence déjà associée à un autre APP_ID, ou une application portant une autre référence, est refusée.
+     */
+    public static String validerRattachementApplication(
+            String appId, String appCodeRef, int nombreObjets,
+            List<String> codesRefApplication, List<String> appIdsAssociesAuCodeRef) {
+        String id = normaliserCodeRef(appId);
+        String code = normaliserCodeRef(appCodeRef);
+        if (id == null) {
+            throw new IllegalArgumentException("Un APP_ID non vide est requis.");
+        }
+        if (code == null) {
+            throw new IllegalArgumentException("Un code de référentiel non vide est requis.");
+        }
+        if (nombreObjets < 1) {
+            throw new ApplicationCatalogueIntrouvableException(
+                    "Aucun objet documenté n'est associé à l'APP_ID « " + id + " ».");
+        }
+
+        if (codesRefApplication != null) {
+            for (String codeExistant : codesRefApplication) {
+                String normalise = normaliserCodeRef(codeExistant);
+                if (normalise != null && !code.equals(normalise)) {
+                    throw new ApplicationNonEnConceptionException(
+                            "L'application « " + id + " » est déjà rattachée au code « " + normalise + " ».");
+                }
+            }
+        }
+        if (appIdsAssociesAuCodeRef != null) {
+            for (String appIdAssocie : appIdsAssociesAuCodeRef) {
+                String normalise = normaliserCodeRef(appIdAssocie);
+                if (normalise == null || !id.equals(normalise)) {
+                    throw new CodeRefDejaAssocieException(
+                            "Le code de référentiel « " + code
+                                    + " » est déjà associé à un autre APP_ID ; aucune fusion n'a été effectuée.");
+                }
+            }
+        }
+        return code;
+    }
+
     public static ResolutionIdentite resoudreAppId(
             List<AppIdFrequence> appIdsExistants, Supplier<String> genererNouvelAppId) {
         Objects.requireNonNull(appIdsExistants, "La liste des APP_ID existants est obligatoire.");
@@ -136,6 +178,30 @@ public final class ResolutionApplication {
 
     public static final class ColonneCodeRefIndisponibleException extends IllegalStateException {
         public ColonneCodeRefIndisponibleException(String message) {
+            super(message);
+        }
+    }
+
+    public static final class ApplicationCatalogueIntrouvableException extends RuntimeException {
+        public ApplicationCatalogueIntrouvableException(String message) {
+            super(message);
+        }
+    }
+
+    public static final class ApplicationNonEnConceptionException extends IllegalStateException {
+        public ApplicationNonEnConceptionException(String message) {
+            super(message);
+        }
+    }
+
+    public static final class CodeRefDejaAssocieException extends IllegalStateException {
+        public CodeRefDejaAssocieException(String message) {
+            super(message);
+        }
+    }
+
+    public static final class RattachementConcurrentException extends IllegalStateException {
+        public RattachementConcurrentException(String message) {
             super(message);
         }
     }
