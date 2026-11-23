@@ -342,3 +342,81 @@ L'interface est accessible sur `http://localhost:4200/dictionnaire`.
 ### Notes de dépannage courantes
 - **`ORA-01031: privilèges insuffisants` sur les commandes `GRANT`** : se produit uniquement si un utilisateur autre que `IAM` ou `SYS` tente d'exécuter des `GRANT` sur `IAM.DICO_DATA_*`. Les commandes `GRANT` ont été isolées dans `sql/local_iam_grants.sql` car `DEV_DEPL` possède déjà les privilèges nécessaires sur le serveur CNaPS.
 - **Avertissements console Chrome (`[Violation] unload is not allowed` / `[Intervention] Slow network is detected`)** : messages informatifs standards du serveur de développement Webpack (`ng serve` / `sockjs.js`) et de préchargement des polices d'icônes globales du template Lucy (`nucleo-outline.woff2`, `boxicons.woff2`) ; ils n'ont aucun impact fonctionnel et disparaissent en build de production (`ng build --prod`).
+
+
+---
+
+## 10. Catalogue unique et statuts
+
+Le catalogue unique fusionne le **référentiel officiel des applications existantes** et les **applications documentées** dans `IAM.DICO_DATA_TABLE`, puis calcule un statut pour chacune. La logique de calcul est pure (aucun accès base) : `CatalogueCalculateur`, couverte par les tests unitaires `CatalogueCalculateurTest`.
+
+### 10.1. Statuts
+
+| Statut d'application | Condition |
+| :--- | :--- |
+| `EXISTANTE_NON_DOCUMENTEE` | Code présent dans le référentiel officiel, aucun objet dans `IAM.DICO_DATA_TABLE`. |
+| `EXISTANTE_DOCUMENTEE` | Code présent dans le référentiel officiel, au moins un objet documenté. |
+| `EN_CONCEPTION` | Code absent du référentiel officiel, au moins un objet documenté. |
+
+| Statut d'objet | Condition |
+| :--- | :--- |
+| `CREE` | L'objet (schéma + nom, type `TABLE` ou `VIEW`) existe dans `ALL_OBJECTS`. |
+| `NON_CREE` | Documenté dans `IAM.DICO_DATA_TABLE` mais non trouvé dans `ALL_OBJECTS`. |
+
+### 10.2. Configuration validée (`application.properties`)
+
+| Propriété | Valeur | Rôle |
+| :--- | :--- | :--- |
+| `dictionnaire.referentiel.tables` | `TRESO.CPT_MENU,TRESO.CPT_MENU_NEW,TRESO.CPT_MENU_OLD` | Sources du référentiel, par ordre de priorité (le libellé de la première table qui connaît un code l'emporte). |
+| `dictionnaire.referentiel.colonne-code` | `MENU_CODE` | Code de l'application (normalisé en `UPPER(TRIM(...))`). |
+| `dictionnaire.referentiel.colonne-libelle` | `MENU_LIBELLE` | Libellé. |
+
+- Chaque nom de table (un seul `.` autorisé pour le schéma) et de colonne est validé par expression régulière stricte (lettres, chiffres, `_`, `$`) avant d'être concaténé au SQL. Une valeur invalide désactive uniquement le catalogue.
+- Constat sur la base (23/11/2026) : l'union des trois tables donne **1945 codes distincts** (`CPT_MENU` : 1864, `CPT_MENU_NEW` : 81, `CPT_MENU_OLD` : 1546). Les codes parasites sont écartés (voir 10.6), soit **1943 codes exploitables**.
+- Le référentiel est mis en cache 60 s côté backend (premier appel ≈ 1,2 s, appels suivants ≈ 30 ms). Les échecs de lecture ne sont pas mis en cache.
+
+### 10.3. Correspondance `APP_ID` ↔ code du référentiel (`APP_CODE_REF`)
+
+`APP_ID` est l'UUID de l'application (`app_id` du modèle ApplicationLucy) : il ne vaut jamais un code du référentiel. Le lien est porté par la colonne `IAM.DICO_DATA_TABLE.APP_CODE_REF` (`VARCHAR2(30)`, script `sql/migration_app_code_ref.sql`) :
+
+- `APP_CODE_REF` renseigné : l'application est une application existante et est identifiée au catalogue par ce code ;
+- `APP_CODE_REF` vide : nouvelle application, identifiée par son `APP_ID` (statut `EN_CONCEPTION`).
+
+Le backend détecte la colonne au vol (`ALL_TAB_COLUMNS`) : il fonctionne avant et après l'application du script.
+
+### 10.4. Endpoints
+
+| Méthode | Endpoint | Description |
+| :---: | :--- | :--- |
+| `GET` | `/api/dictionnaire/catalogue/applications[?statut=...]` | Réponse `{ referentielDisponible, catalogueOracleDisponible, applications: [...] }`. Chaque application : `code`, `libelle`, `statut`, `schemas`, `nbObjets`, `nbObjetsCrees`. Un statut inconnu renvoie `400`. |
+| `GET` | `/api/dictionnaire/catalogue/applications/{code}/objets` | Objets documentés d'une application : `schema`, `nom`, `type`, `statut` (`CREE` / `NON_CREE`), `description`. Le code est le code effectif (`APP_CODE_REF` sinon `APP_ID`). |
+
+- `referentielDisponible = false` : le référentiel est illisible, tous les statuts `EXISTANTE_*` sont absents et les statuts ne sont pas fiables.
+- `catalogueOracleDisponible = false` : `ALL_OBJECTS` est illisible, `nbObjetsCrees` vaut 0 partout.
+- L'endpoint `/api/dictionnaire/applications` (section 7.1) est inchangé.
+
+### 10.5. Routes frontend (`/dictionnaire/...`)
+
+| Route | Page |
+| :--- | :--- |
+| `/dictionnaire` | Redirige vers `/dictionnaire/catalogue` (l'accueil réel n'existe pas encore ; `AccueilComponent` reste déclaré). |
+| `/dictionnaire/catalogue?statut=&q=&page=` | Catalogue : recherche, filtres par statut avec compteurs, pagination compacte (25 lignes par page). L'état est conservé dans l'URL. |
+| `/dictionnaire/catalogue/:application` | Fiche application et liste de ses objets. |
+| `/dictionnaire/catalogue/:application/:schema/:objet?onglet=` | Fiche d'un objet. `onglet` = `colonnes`, `triggers`, `index`, `relations` ou `script` (absent ou invalide : `colonnes`). |
+| `/dictionnaire/documenter?mode=ia\|formulaire&application=CODE` | Point d'entrée de la documentation (contenu à venir). |
+| `/dictionnaire/export` | Export (contenu à venir). |
+| `/dictionnaire/ancien` | Ancienne page, conservée telle quelle. |
+
+Le service `catalogue.service.ts` bascule entre données factices et vraie API via `UTILISER_DONNEES_FACTICES` (actuellement `false`). `obtenirCatalogue()` retourne la réponse complète avec les drapeaux ; `listerApplications()` ne retourne que le tableau.
+
+### 10.6. Limites connues
+
+- **Le référentiel décrit des écrans Oracle Forms, pas des applications.** Les tables `CPT_MENU*` sont des arbres de menus (`MENU_FMX` = fichier Forms ; 2568 des 2778 lignes de `CPT_MENU` ont pour parent `TTRAI`). Le portail les désigne néanmoins comme des « applications ». Aucune autre table lisible ne couvre l'ensemble des applications de la CNaPS (`LUCYGESTINCIAPPLI.INC_APPLICATION` : 239 applications, catalogue de la gestion des incidents).
+- **Codes parasites écartés** : un code du référentiel de moins de 2 caractères ou sans lettre ni chiffre est ignoré (`-` et `A` constatés). Les libellés douteux (`_app` pour `31006`) ne sont pas filtrés.
+- **`ALL_OBJECTS` ne montre que les objets sur lesquels `DEV_DEPL` a un privilège.** `DBA_OBJECTS` n'est pas accessible (`ORA-00942`) : un objet `NON_CREE` peut exister sans être visible. `ALL_TABLES` + `ALL_VIEWS` donnent le même résultat qu'`ALL_OBJECTS`.
+- **Le module de saisie n'écrit pas encore `APP_CODE_REF`** : tant qu'il ne le fait pas, aucune application ne peut être `EXISTANTE_DOCUMENTEE`. Si les objets d'un même `APP_ID` portent des `APP_CODE_REF` différents, l'application se scinde en plusieurs codes.
+- **Données d'exemple incohérentes** : les objets `IAM.APP_DMD_*` sont déclarés dans le schéma `IAM` alors qu'ils existent dans `DEV_DEPL` ; leur fiche objet répond « introuvable ».
+- **Temps de réponse du détail d'un objet** : `GET /schemas/{schema}/objets/{nom}` a mesuré de 2 s à 7,7 s sur la vraie base.
+- **Build Angular** : `ng build --aot` seul échoue sur le budget de `dictionnaire-donnees.component.scss` (25 kB pour 20 kB autorisés), antérieur au catalogue ; la compilation AOT en configuration `development` passe sans erreur ni avertissement. Sous Node 17+, `NODE_OPTIONS=--openssl-legacy-provider` est nécessaire (section 9).
+- **Mise en page** : les pages du catalogue sont du HTML sans styles (contrainte « aucun CSS ») ; sous la barre latérale du portail, le début des lignes peut être masqué.
+- **Jeu de caractères** : certains libellés Oracle remontent avec des caractères de remplacement (`�`), y compris sur l'endpoint existant ; la cause est dans les données ou la connexion, pas dans le catalogue.
