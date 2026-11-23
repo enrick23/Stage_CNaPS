@@ -43,20 +43,20 @@
   </div>
 
   <nav class="tabs">
-    <button type="button" [class.active]="ongletDetail === 'colonnes'" (click)="ongletDetail = 'colonnes'">
+    <button type="button" [class.active]="ongletDetail === 'colonnes'" (click)="choisirOnglet('colonnes')">
       Colonnes <small>{{ detail.colonnes.length }}</small>
     </button>
-    <button type="button" [class.active]="ongletDetail === 'triggers'" (click)="ongletDetail = 'triggers'">
+    <button type="button" [class.active]="ongletDetail === 'triggers'" (click)="choisirOnglet('triggers')">
       Triggers &amp; séquences <small>{{ detail.triggers.length + detail.sequences.length }}</small>
     </button>
-    <button type="button" [class.active]="ongletDetail === 'index'" (click)="ongletDetail = 'index'">
+    <button type="button" [class.active]="ongletDetail === 'index'" (click)="choisirOnglet('index')">
       Index <small>{{ detail.index.length }}</small>
     </button>
-    <button type="button" [class.active]="ongletDetail === 'relations'" (click)="ongletDetail = 'relations'">
+    <button type="button" [class.active]="ongletDetail === 'relations'" (click)="choisirOnglet('relations')">
       Relations <small>{{ detail.relationsSortantes.length + detail.relationsEntrantes.length }}</small>
     </button>
     <button type="button" *ngIf="detail.script" [class.active]="ongletDetail === 'script'"
-      (click)="ongletDetail = 'script'">
+      (click)="choisirOnglet('script')">
       Script de la vue
     </button>
   </nav>

@@ -10,6 +10,7 @@ import { FicheApplicationComponent } from './pages/fiche-application/fiche-appli
 import { DocumenterComponent } from './pages/documenter/documenter.component';
 import { ExportComponent } from './pages/export/export.component';
 import { FicheObjetComponent } from './components/fiche-objet/fiche-objet.component';
+import { FicheObjetPageComponent } from './pages/fiche-objet-page/fiche-objet-page.component';
 
 @NgModule({
   declarations: [
@@ -21,6 +22,7 @@ import { FicheObjetComponent } from './components/fiche-objet/fiche-objet.compon
     DocumenterComponent,
     ExportComponent,
     FicheObjetComponent,
+    FicheObjetPageComponent,
   ],
   imports: [CommonModule, FormsModule, DictionnaireRoutingModule],
 })

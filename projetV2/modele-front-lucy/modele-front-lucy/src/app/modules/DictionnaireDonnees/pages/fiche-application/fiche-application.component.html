@@ -68,7 +68,7 @@
       <tbody>
         <tr *ngFor="let obj of objets">
           <td>
-            <a routerLink="/dictionnaire/ancien">{{ obj.schema }}.{{ obj.nom }}</a>
+            <a [routerLink]="['/dictionnaire/catalogue', application.code, obj.schema, obj.nom]">{{ obj.schema }}.{{ obj.nom }}</a>
           </td>
           <td>{{ obj.schema }}</td>
           <td>{{ obj.type === 'VIEW' ? 'Vue' : 'Table' }}</td>

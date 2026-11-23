@@ -36,6 +36,8 @@ export interface DicoObjet {
   referentiel?: boolean | null;
   appCode?: string | null;
   appLibelle?: string | null;
+  /** Code de l'application existante du référentiel (APP_CODE_REF), s'il est renseigné. */
+  appCodeRef?: string | null;
 }
 
 export interface DicoColonne {
@@ -252,5 +254,18 @@ export class DictionnaireService {
       observe: 'response',
       responseType: 'blob',
     });
+  }
+
+  /** Enregistre sur le poste le fichier reçu de exporter() (nom pris dans Content-Disposition si présent). */
+  declencherTelechargement(res: HttpResponse<Blob>, nomParDefaut: string): void {
+    const dispo = res.headers.get('Content-Disposition') ?? '';
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(dispo);
+    const nom = match ? decodeURIComponent(match[1]) : nomParDefaut;
+    const url = URL.createObjectURL(res.body as Blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nom;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }

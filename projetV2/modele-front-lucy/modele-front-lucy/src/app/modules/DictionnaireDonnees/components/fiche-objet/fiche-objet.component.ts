@@ -1,6 +1,11 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { DicoDetailObjet, DicoObjet } from '../../services/dictionnaire.service';
 
+/** Onglets de la fiche d'un objet. */
+export type OngletFicheObjet = 'colonnes' | 'triggers' | 'index' | 'relations' | 'script';
+
+export const ONGLETS_FICHE_OBJET: OngletFicheObjet[] = ['colonnes', 'triggers', 'index', 'relations', 'script'];
+
 /**
  * Affichage de la fiche d'un objet du dictionnaire (table ou vue) :
  * en-tête, colonnes, triggers et séquences, index, relations, script de vue.
@@ -40,8 +45,24 @@ export class FicheObjetComponent {
   /** Clic sur une table référencée dans l'onglet Relations. */
   @Output() ouvrirReference = new EventEmitter<{ schema: string; table: string }>();
 
+  /**
+   * Onglet imposé par le parent (ex. paramètre d'URL). Valeur absente ou invalide = colonnes.
+   * Sans liaison [onglet], le composant gère seul son onglet (ancienne page).
+   */
+  @Input() set onglet(valeur: OngletFicheObjet | null | undefined) {
+    this.ongletDetail = valeur && ONGLETS_FICHE_OBJET.indexOf(valeur) !== -1 ? valeur : 'colonnes';
+  }
+
+  /** Émis quand l'utilisateur change d'onglet. */
+  @Output() ongletChange = new EventEmitter<OngletFicheObjet>();
+
   /** Onglet actif. Réinitialisé à chaque création du composant (le parent le recrée à chaque sélection). */
-  ongletDetail: 'colonnes' | 'triggers' | 'index' | 'relations' | 'script' = 'colonnes';
+  ongletDetail: OngletFicheObjet = 'colonnes';
+
+  choisirOnglet(onglet: OngletFicheObjet): void {
+    this.ongletDetail = onglet;
+    this.ongletChange.emit(onglet);
+  }
 
   /** Reprise à l'identique de DictionnaireDonneesComponent.classeSensibilite. */
   classeSensibilite(niveau: number | null): string {

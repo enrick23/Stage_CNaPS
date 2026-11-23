@@ -1,0 +1,36 @@
+<section>
+  <nav aria-label="Fil d'Ariane">
+    <a routerLink="/dictionnaire/catalogue">Catalogue</a>
+    &gt;
+    <a [routerLink]="['/dictionnaire/catalogue', application]">{{ libelleApplication || application }}</a>
+    &gt;
+    <span>{{ schema }}.{{ objet }}</span>
+  </nav>
+
+  <p *ngIf="chargement">Chargement de la fiche de l'objet…</p>
+
+  <ng-container *ngIf="!chargement && introuvable">
+    <p>L'objet « {{ schema }}.{{ objet }} » est introuvable dans le dictionnaire.</p>
+    <p><a [routerLink]="['/dictionnaire/catalogue', application]">Retour à l'application</a></p>
+  </ng-container>
+
+  <ng-container *ngIf="!chargement && erreur">
+    <p>{{ erreur }}</p>
+    <p><a [routerLink]="['/dictionnaire/catalogue', application]">Retour à l'application</a></p>
+  </ng-container>
+
+  <p *ngIf="message">{{ message }}</p>
+
+  <app-fiche-objet
+    *ngIf="!chargement && detail"
+    [detail]="detail"
+    [appLibelle]="libelleApplication"
+    [objets]="objetsConnus"
+    [exportEnCours]="exportEnCours"
+    [onglet]="onglet"
+    (ongletChange)="changerOnglet($event)"
+    (editer)="editer()"
+    (exporter)="exporter()"
+    (ouvrirReference)="ouvrirReference($event.schema, $event.table)"
+  ></app-fiche-objet>
+</section>

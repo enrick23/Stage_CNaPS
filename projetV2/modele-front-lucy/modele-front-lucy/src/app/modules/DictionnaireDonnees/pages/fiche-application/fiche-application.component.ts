@@ -13,8 +13,7 @@ import { CatalogueService } from '../../services/catalogue.service';
  * Fiche d'une application du catalogue unique (T3) :
  * affiche le libellé, le statut, les schémas et la liste des objets avec leur
  * statut individuel (« Créée dans Oracle » / « Pas encore créée »).
- * Chaque objet pointe provisoirement vers /dictionnaire/ancien en attendant
- * la page dédiée de fiche objet.
+ * Chaque objet pointe vers sa fiche : /dictionnaire/catalogue/:application/:schema/:objet.
  */
 @Component({
   selector: 'app-dictionnaire-fiche-application',
