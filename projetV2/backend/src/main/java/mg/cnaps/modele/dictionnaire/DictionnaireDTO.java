@@ -160,6 +160,8 @@ public final class DictionnaireDTO {
     /** Données reçues depuis le formulaire de création / édition du dictionnaire. */
     public static class FormulaireObjet {
         public String appCode;
+        /** Code normalisé du référentiel pour une application existante ; absent pour une nouvelle application. */
+        public String appCodeRef;
         public String appLibelle;
         public String appDescription;
         public String schema;

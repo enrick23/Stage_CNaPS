@@ -14,6 +14,9 @@ import mg.cnaps.modele.dictionnaire.DictionnaireDTO.Trigger;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ApplicationCatalogue;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ObjetCatalogue;
 import mg.cnaps.modele.dictionnaire.DictionnaireDTO.ReponseCatalogue;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.AppIdFrequence;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.Reference;
+import mg.cnaps.modele.dictionnaire.ResolutionApplication.ResolutionIdentite;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,14 +72,41 @@ public class DictionnaireRepository {
         String nomObjet = form.nomObjet.trim().toUpperCase(Locale.ROOT);
         String appCode = form.appCode == null || form.appCode.trim().isEmpty()
                 ? null : form.appCode.trim().toUpperCase(Locale.ROOT);
+        String appCodeRef = ResolutionApplication.normaliserCodeRef(form.appCodeRef);
         String appLibelle = form.appLibelle == null || form.appLibelle.trim().isEmpty()
                 ? null : form.appLibelle.trim();
-        if (appCode == null && appLibelle != null) {
-            appCode = genererCodeApplication(appLibelle);
-        }
-        if (appLibelle == null && appCode != null) {
-            Application appExistante = application(appCode);
-            appLibelle = appExistante != null && appExistante.libelle != null ? appExistante.libelle : appCode;
+        boolean codeRefDisponible = colonneCodeRefDisponible();
+        if (appCodeRef != null) {
+            if (!codeRefDisponible) {
+                throw new ResolutionApplication.ColonneCodeRefIndisponibleException(
+                        "La colonne IAM.DICO_DATA_TABLE.APP_CODE_REF n'est pas disponible ; l'application ne peut pas être rattachée.");
+            }
+            Reference reference = ResolutionApplication.validerCodeRef(appCodeRef, referentielPourEcriture());
+            appCodeRef = reference.code;
+            appLibelle = ResolutionApplication.libelleParDefaut(appLibelle, reference);
+
+            List<AppIdFrequence> idsExistants = jdbc.query(
+                    "SELECT UPPER(TRIM(APP_ID)) AS ID_APPLICATION, COUNT(*) AS NB_LIGNES "
+                  + "FROM IAM.DICO_DATA_TABLE WHERE UPPER(TRIM(APP_CODE_REF)) = ? AND APP_ID IS NOT NULL "
+                  + "GROUP BY UPPER(TRIM(APP_ID)) ORDER BY NB_LIGNES DESC, ID_APPLICATION",
+                    (rs, i) -> new AppIdFrequence(rs.getString("ID_APPLICATION"), rs.getInt("NB_LIGNES")),
+                    appCodeRef);
+            final String libellePourId = appLibelle;
+            ResolutionIdentite identite = ResolutionApplication.resoudreAppId(
+                    idsExistants, () -> genererCodeApplication(libellePourId));
+            appCode = identite.appId;
+            if (identite.plusieursAppIds) {
+                LOG.warn("Plusieurs APP_ID sont associés à APP_CODE_REF {} : {}. Utilisation de {}.",
+                        appCodeRef, identite.appIdsCandidats, identite.appId);
+            }
+        } else {
+            if (appCode == null && appLibelle != null) {
+                appCode = genererCodeApplication(appLibelle);
+            }
+            if (appLibelle == null && appCode != null) {
+                Application appExistante = application(appCode);
+                appLibelle = appExistante != null && appExistante.libelle != null ? appExistante.libelle : appCode;
+            }
         }
         String typeObjet = "VIEW".equalsIgnoreCase(form.typeObjet) ? "VIEW" : "TABLE";
         String flagRef = form.flagRef ? "Y" : "N";
@@ -90,20 +120,31 @@ public class DictionnaireRepository {
         String tableId;
         if (!existants.isEmpty()) {
             tableId = existants.get(0);
-            jdbc.update(
-                    "UPDATE IAM.DICO_DATA_TABLE SET TYPE_OBJET = ?, DESCRIPTION = ?, FLAG_REF = ?, "
-                  + "APP_ID = ?, APP_LIBELLE = ?, SEQUENCE_ASSOCIEE = ? WHERE TABLE_ID = ?",
-                    typeObjet, form.description, flagRef, appCode, appLibelle, form.sequences, tableId);
+            String sqlMaj = "UPDATE IAM.DICO_DATA_TABLE SET TYPE_OBJET = ?, DESCRIPTION = ?, FLAG_REF = ?, "
+                    + "APP_ID = ?, APP_LIBELLE = ?, SEQUENCE_ASSOCIEE = ?"
+                    + ResolutionApplication.clauseMiseAJourCodeRef(codeRefDisponible)
+                    + " WHERE TABLE_ID = ?";
+            List<Object> parametresMaj = new ArrayList<>(Arrays.asList(
+                    typeObjet, form.description, flagRef, appCode, appLibelle, form.sequences));
+            if (codeRefDisponible) parametresMaj.add(appCodeRef);
+            parametresMaj.add(tableId);
+            jdbc.update(sqlMaj, parametresMaj.toArray());
             // Désactiver les anciennes colonnes et triggers via UPDATE (au lieu de DELETE)
             jdbc.update("UPDATE IAM.DICO_DATA_COLUMN SET ORDRE = -1 WHERE TABLE_ID = ?", tableId);
             jdbc.update("UPDATE IAM.DICO_DATA_TRIGGER SET NOM_TRIGGER = '-' WHERE TABLE_ID = ?", tableId);
         } else {
             tableId = jdbc.queryForObject(
                     "SELECT 'DTB' || LPAD(IAM.SEQ_DICO_DATA_TABLE.NEXTVAL, 6, '0') FROM dual", String.class);
+            String sqlInsert = "INSERT INTO IAM.DICO_DATA_TABLE (TABLE_ID, NOM_TABLE, TYPE_OBJET, DESCRIPTION, FLAG_REF, "
+                    + "SCHEMAS, APP_ID, APP_LIBELLE, SEQUENCE_ASSOCIEE"
+                    + ResolutionApplication.colonneInsertCodeRef(codeRefDisponible)
+                    + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?"
+                    + ResolutionApplication.parametreInsertCodeRef(codeRefDisponible) + ")";
+            List<Object> parametresInsert = new ArrayList<>(Arrays.asList(
+                    tableId, nomObjet, typeObjet, form.description, flagRef, schema, appCode, appLibelle, form.sequences));
+            if (codeRefDisponible) parametresInsert.add(appCodeRef);
             jdbc.update(
-                    "INSERT INTO IAM.DICO_DATA_TABLE (TABLE_ID, NOM_TABLE, TYPE_OBJET, DESCRIPTION, FLAG_REF, "
-                  + "SCHEMAS, APP_ID, APP_LIBELLE, SEQUENCE_ASSOCIEE) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    tableId, nomObjet, typeObjet, form.description, flagRef, schema, appCode, appLibelle, form.sequences);
+                    sqlInsert, parametresInsert.toArray());
         }
 
         // Récupérer les colonnes existantes de cette table pour les réutiliser via UPDATE
@@ -391,6 +432,18 @@ public class DictionnaireRepository {
         cacheReferentiel = new CacheReferentiel(sqlReferentiel,
                 System.currentTimeMillis() + DUREE_CACHE_REFERENTIEL_MS, new LinkedHashMap<>(referentiel));
         return referentiel;
+    }
+
+    /** Lecture réservée aux écritures : une référence inconnue ou illisible ne peut jamais être attachée à l'aveugle. */
+    private Map<String, String> referentielPourEcriture() {
+        final String sqlReferentiel;
+        try {
+            sqlReferentiel = referentielConfig.requete();
+        } catch (IllegalStateException e) {
+            throw new ResolutionApplication.ReferentielIndisponibleException(
+                    "La configuration du référentiel des applications est invalide ; l'enregistrement est refusé.", e);
+        }
+        return lireReferentiel(sqlReferentiel);
     }
 
     /** Objets documentés d'une application, avec leur statut CREE / NON_CREE. */

@@ -382,7 +382,9 @@ Le catalogue unique fusionne le **référentiel officiel des applications exista
 - `APP_CODE_REF` renseigné : l'application est une application existante et est identifiée au catalogue par ce code ;
 - `APP_CODE_REF` vide : nouvelle application, identifiée par son `APP_ID` (statut `EN_CONCEPTION`).
 
-Le backend détecte la colonne au vol (`ALL_TAB_COLUMNS`) : il fonctionne avant et après l'application du script.
+Lors de l'enregistrement d'une application existante, `appCodeRef` est normalisé en `UPPER(TRIM(...))` et validé par lecture du référentiel (cache de 60 s). Un code inconnu est refusé avec HTTP 400 ; si le référentiel est illisible, l'écriture est refusée avec HTTP 503. L'`APP_ID` déjà associé à ce `APP_CODE_REF` est réutilisé. Si plusieurs `APP_ID` sont trouvés, le plus fréquent est utilisé et l'anomalie est journalisée. Sans association existante, un nouvel UUID est généré par le mécanisme existant ; le libellé du référentiel devient le `APP_LIBELLE` par défaut (un libellé explicitement saisi reste prioritaire).
+
+Si une mise à jour ne fournit pas `appCodeRef`, `APP_CODE_REF` n'est pas détaché : l'`UPDATE` conserve sa valeur avec `NVL`. Pour une nouvelle application, le champ est absent et la colonne reste `NULL`. Le backend détecte la colonne au vol (`ALL_TAB_COLUMNS`) ; un formulaire qui demande un rattachement est refusé si la colonne n'est pas disponible, tandis que les anciens formulaires sans `appCodeRef` conservent le comportement antérieur.
 
 ### 10.4. Endpoints
 
@@ -390,6 +392,8 @@ Le backend détecte la colonne au vol (`ALL_TAB_COLUMNS`) : il fonctionne avant 
 | :---: | :--- | :--- |
 | `GET` | `/api/dictionnaire/catalogue/applications[?statut=...]` | Réponse `{ referentielDisponible, catalogueOracleDisponible, applications: [...] }`. Chaque application : `code`, `libelle`, `statut`, `schemas`, `nbObjets`, `nbObjetsCrees`. Un statut inconnu renvoie `400`. |
 | `GET` | `/api/dictionnaire/catalogue/applications/{code}/objets` | Objets documentés d'une application : `schema`, `nom`, `type`, `statut` (`CREE` / `NON_CREE`), `description`. Le code est le code effectif (`APP_CODE_REF` sinon `APP_ID`). |
+| `POST` | `/api/dictionnaire/objets` | Enregistre un objet ; `appCodeRef` facultatif rattache une application existante après validation du référentiel. |
+| `POST` | `/api/dictionnaire/objets/lot` | Même règle `appCodeRef` pour chaque objet du lot. |
 
 - `referentielDisponible = false` : le référentiel est illisible, tous les statuts `EXISTANTE_*` sont absents et les statuts ne sont pas fiables.
 - `catalogueOracleDisponible = false` : `ALL_OBJECTS` est illisible, `nbObjetsCrees` vaut 0 partout.
@@ -414,9 +418,9 @@ Le service `catalogue.service.ts` bascule entre données factices et vraie API v
 - **Le référentiel décrit des écrans Oracle Forms, pas des applications.** Les tables `CPT_MENU*` sont des arbres de menus (`MENU_FMX` = fichier Forms ; 2568 des 2778 lignes de `CPT_MENU` ont pour parent `TTRAI`). Le portail les désigne néanmoins comme des « applications ». Aucune autre table lisible ne couvre l'ensemble des applications de la CNaPS (`LUCYGESTINCIAPPLI.INC_APPLICATION` : 239 applications, catalogue de la gestion des incidents).
 - **Codes parasites écartés** : un code du référentiel de moins de 2 caractères ou sans lettre ni chiffre est ignoré (`-` et `A` constatés). Les libellés douteux (`_app` pour `31006`) ne sont pas filtrés.
 - **`ALL_OBJECTS` ne montre que les objets sur lesquels `DEV_DEPL` a un privilège.** `DBA_OBJECTS` n'est pas accessible (`ORA-00942`) : un objet `NON_CREE` peut exister sans être visible. `ALL_TABLES` + `ALL_VIEWS` donnent le même résultat qu'`ALL_OBJECTS`.
-- **Le module de saisie n'écrit pas encore `APP_CODE_REF`** : tant qu'il ne le fait pas, aucune application ne peut être `EXISTANTE_DOCUMENTEE`. Si les objets d'un même `APP_ID` portent des `APP_CODE_REF` différents, l'application se scinde en plusieurs codes.
+- **Identité d'application** : `APP_ID` reste l'UUID du modèle ApplicationLucy ; ne pas lui substituer le code du référentiel. Un même `APP_CODE_REF` doit réutiliser le même `APP_ID`.
 - **Données d'exemple incohérentes** : les objets `IAM.APP_DMD_*` sont déclarés dans le schéma `IAM` alors qu'ils existent dans `DEV_DEPL` ; leur fiche objet répond « introuvable ».
 - **Temps de réponse du détail d'un objet** : `GET /schemas/{schema}/objets/{nom}` a mesuré de 2 s à 7,7 s sur la vraie base.
-- **Build Angular** : `ng build --aot` seul échoue sur le budget de `dictionnaire-donnees.component.scss` (25 kB pour 20 kB autorisés), antérieur au catalogue ; la compilation AOT en configuration `development` passe sans erreur ni avertissement. Sous Node 17+, `NODE_OPTIONS=--openssl-legacy-provider` est nécessaire (section 9).
-- **Mise en page** : les pages du catalogue sont du HTML sans styles (contrainte « aucun CSS ») ; sous la barre latérale du portail, le début des lignes peut être masqué.
+- **Build Angular** : le budget `anyComponentStyle` est fixé à un avertissement de 10 kB et une erreur à 35 kB ; l'ancienne feuille `dictionnaire-donnees.component.scss` dépasse encore l'avertissement avec environ 25 kB. Utiliser `ng build --aot --configuration production` avec `NODE_OPTIONS=--openssl-legacy-provider` sous Node 17+ (section 9).
+- **Mise en page** : les nouvelles pages utilisent la charte du dictionnaire et un décalage de 80 px sous la barre fixe du portail. La feuille de style historique reste inchangée pour `/dictionnaire/ancien`.
 - **Jeu de caractères** : certains libellés Oracle remontent avec des caractères de remplacement (`�`), y compris sur l'endpoint existant ; la cause est dans les données ou la connexion, pas dans le catalogue.
