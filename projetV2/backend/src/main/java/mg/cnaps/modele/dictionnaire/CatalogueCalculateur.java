@@ -24,6 +24,10 @@ import java.util.TreeSet;
  * - dans le référentiel, avec au moins un objet      -> EXISTANTE_DOCUMENTEE
  * - hors référentiel, avec au moins un objet         -> EN_CONCEPTION
  * - hors référentiel et sans objet                   -> ignorée (ne peut pas se produire en pratique)
+ *
+ * Code d'une application : APP_ID du dictionnaire est un UUID généré (modèle ApplicationLucy), il ne vaut donc
+ * jamais un code du référentiel. Quand l'objet porte un APP_CODE_REF, c'est ce code de l'application existante
+ * qui identifie l'application au catalogue ; sinon, le code reste l'APP_ID (application en conception).
  */
 public final class CatalogueCalculateur {
 
@@ -47,6 +51,12 @@ public final class CatalogueCalculateur {
         if (code == null) return null;
         String c = code.trim().toUpperCase(Locale.ROOT);
         return c.isEmpty() ? null : c;
+    }
+
+    /** Code d'application au catalogue : APP_CODE_REF s'il est renseigné, sinon APP_ID (normalisés). Null si aucun. */
+    public static String codeEffectif(Objet o) {
+        String ref = normaliserCode(o.appCodeRef);
+        return ref != null ? ref : normaliserCode(o.appCode);
     }
 
     /** Statut d'une application, ou null si elle ne doit pas figurer au catalogue. */
@@ -84,16 +94,23 @@ public final class CatalogueCalculateur {
             libellesRef.merge(code, lib, (ancien, nouveau) -> ancien.isEmpty() ? nouveau : ancien);
         }
 
-        Map<String, String> libellesDoc = new LinkedHashMap<>();
-        for (Application a : documentees) {
-            String code = normaliserCode(a.code);
-            if (code != null) libellesDoc.putIfAbsent(code, a.libelle == null ? "" : a.libelle.trim());
-        }
-
+        // APP_ID (UUID) -> code effectif, pour rattacher les applications documentées à leur code du référentiel.
+        Map<String, String> codeParAppId = new LinkedHashMap<>();
         Map<String, List<Objet>> objetsParApp = new LinkedHashMap<>();
         for (Objet o : objets) {
-            String code = normaliserCode(o.appCode);
-            if (code != null) objetsParApp.computeIfAbsent(code, k -> new ArrayList<>()).add(o);
+            String code = codeEffectif(o);
+            if (code == null) continue;
+            String appId = normaliserCode(o.appCode);
+            if (appId != null) codeParAppId.putIfAbsent(appId, code);
+            objetsParApp.computeIfAbsent(code, k -> new ArrayList<>()).add(o);
+        }
+
+        Map<String, String> libellesDoc = new LinkedHashMap<>();
+        for (Application a : documentees) {
+            String appId = normaliserCode(a.code);
+            if (appId == null) continue;
+            String code = codeParAppId.getOrDefault(appId, appId);
+            libellesDoc.putIfAbsent(code, a.libelle == null ? "" : a.libelle.trim());
         }
 
         Set<String> codes = new LinkedHashSet<>(libellesRef.keySet());

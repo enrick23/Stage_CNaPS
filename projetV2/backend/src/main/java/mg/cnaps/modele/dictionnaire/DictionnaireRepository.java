@@ -338,7 +338,7 @@ public class DictionnaireRepository {
         Map<String, String> referentiel = new LinkedHashMap<>();
         boolean referentielDisponible = true;
         try {
-            // À VALIDER avec la base (RJ45) : table, colonnes et droit SELECT de DEV_DEPL sur la source du référentiel.
+            // Sources validées sur la base : DEV_DEPL lit TRESO.CPT_MENU, CPT_MENU_NEW et CPT_MENU_OLD.
             jdbc.query(sqlReferentiel, rs -> {
                 String code = CatalogueCalculateur.normaliserCode(rs.getString(1));
                 if (code == null) return;
@@ -379,8 +379,10 @@ public class DictionnaireRepository {
      */
     private Set<String> objetsExistantsOracle() {
         try {
-            // À VALIDER avec la base (RJ45) : visibilité de ALL_OBJECTS pour DEV_DEPL sur les schémas métier
-            // (ALL_OBJECTS ne montre que les objets sur lesquels DEV_DEPL a un privilège).
+            // Validé sur la base : ALL_OBJECTS expose bien les schémas métier (DRH, SIG, TRESO, IAM...) et donne le même
+            // résultat que ALL_TABLES + ALL_VIEWS. Limite restante : ALL_OBJECTS ne montre que les objets sur lesquels
+            // DEV_DEPL a un privilège, et DBA_OBJECTS n'est pas accessible (ORA-00942) : un objet « non créé » peut donc
+            // exister mais être invisible pour DEV_DEPL ; les deux cas ne sont pas distinguables.
             return new LinkedHashSet<>(jdbc.query(
                     "SELECT UPPER(TRIM(t.SCHEMAS)), UPPER(TRIM(t.NOM_TABLE)) "
                   + "  FROM IAM.DICO_DATA_TABLE t "
@@ -428,6 +430,27 @@ public class DictionnaireRepository {
 
     // ------------------------------------------------------------------ Objets (IAM.DICO_DATA_TABLE)
 
+    /** Mémorisé seulement une fois la colonne trouvée : tant qu'elle manque, on revérifie (le DDL peut être appliqué à chaud). */
+    private volatile boolean colonneCodeRefPresente = false;
+
+    /**
+     * Vrai si IAM.DICO_DATA_TABLE possède la colonne APP_CODE_REF (lien APP_ID UUID -> code du référentiel).
+     * Tant que le script sql/migration_app_code_ref.sql n'est pas appliqué, le catalogue fonctionne sans
+     * correspondance (comportement antérieur) au lieu d'échouer sur ORA-00904.
+     */
+    private boolean colonneCodeRefDisponible() {
+        if (colonneCodeRefPresente) return true;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM ALL_TAB_COLUMNS WHERE OWNER = 'IAM' AND TABLE_NAME = 'DICO_DATA_TABLE' "
+                  + "AND COLUMN_NAME = 'APP_CODE_REF'", Integer.class);
+            colonneCodeRefPresente = n != null && n > 0;
+        } catch (DataAccessException e) {
+            LOG.warn("Détection de APP_CODE_REF impossible : correspondance code référentiel désactivée. Cause : {}", e.getMessage());
+        }
+        return colonneCodeRefPresente;
+    }
+
     public List<Objet> objets(String schema, String nom) {
         return objets(schema, nom, null);
     }
@@ -443,14 +466,16 @@ public class DictionnaireRepository {
 
         List<Objet> resultat = new ArrayList<>();
         try {
+            String exprCodeRef = colonneCodeRefDisponible() ? "UPPER(TRIM(t.APP_CODE_REF))" : "CAST(NULL AS VARCHAR2(30))";
             String sqlDico =
                     "SELECT UPPER(TRIM(t.SCHEMAS)), UPPER(TRIM(t.NOM_TABLE)), NVL(t.TYPE_OBJET, 'TABLE'), "
                   + "       t.DESCRIPTION, t.FLAG_REF, UPPER(TRIM(t.APP_ID)), NVL(t.APP_LIBELLE, t.APP_ID), "
-                  + "       (SELECT COUNT(*) FROM IAM.DICO_DATA_COLUMN c WHERE c.TABLE_ID = t.TABLE_ID AND NVL(c.ORDRE, 1) > 0) AS nb_col "
+                  + "       (SELECT COUNT(*) FROM IAM.DICO_DATA_COLUMN c WHERE c.TABLE_ID = t.TABLE_ID AND NVL(c.ORDRE, 1) > 0) AS nb_col, "
+                  + "       " + exprCodeRef + " "
                   + "  FROM IAM.DICO_DATA_TABLE t "
                   + " WHERE (? IS NULL OR UPPER(TRIM(t.SCHEMAS)) = ?) "
                   + "   AND (? IS NULL OR UPPER(TRIM(t.NOM_TABLE)) = ?) "
-                  + "   AND (? IS NULL OR UPPER(TRIM(t.APP_ID)) = ?) "
+                  + "   AND (? IS NULL OR UPPER(TRIM(t.APP_ID)) = ? OR " + exprCodeRef + " = ?) "
                   + " ORDER BY UPPER(TRIM(t.SCHEMAS)), UPPER(TRIM(t.NOM_TABLE))";
             jdbc.query(sqlDico, rs -> {
                 Objet o = new Objet(
@@ -462,8 +487,9 @@ public class DictionnaireRepository {
                 o.referentiel = "Y".equalsIgnoreCase(rs.getString(5));
                 o.appCode = rs.getString(6);
                 o.appLibelle = rs.getString(7);
+                o.appCodeRef = rs.getString(9);
                 resultat.add(o);
-            }, v(schFiltre), v(schFiltre), v(nomFiltre), v(nomFiltre), v(appFiltre), v(appFiltre));
+            }, v(schFiltre), v(schFiltre), v(nomFiltre), v(nomFiltre), v(appFiltre), v(appFiltre), v(appFiltre));
         } catch (DataAccessException ignored) { }
 
         return resultat;

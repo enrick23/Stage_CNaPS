@@ -137,9 +137,22 @@ public class CatalogueCalculateurTest {
     // --- Configuration du référentiel : protection contre l'injection SQL par propriété ---
 
     @Test
-    public void requeteReferentielValide() {
-        assertEquals("SELECT UPPER(TRIM(MENU_CODE)), MENU_LIBELLE FROM TRESO.CPT_MENU WHERE MENU_CODE IS NOT NULL",
+    public void requeteReferentielUneTable() {
+        assertEquals("SELECT REF_CODE, REF_LIBELLE FROM ("
+                + "SELECT UPPER(TRIM(MENU_CODE)) AS REF_CODE, MENU_LIBELLE AS REF_LIBELLE, 1 AS REF_RANG "
+                + "FROM TRESO.CPT_MENU WHERE MENU_CODE IS NOT NULL) ORDER BY REF_RANG",
                 ReferentielApplicationsConfig.construireRequete("TRESO.CPT_MENU", "MENU_CODE", "MENU_LIBELLE"));
+    }
+
+    @Test
+    public void requeteReferentielTroisTablesParOrdreDePriorite() {
+        String sql = ReferentielApplicationsConfig.construireRequete(
+                "TRESO.CPT_MENU, TRESO.CPT_MENU_NEW ,TRESO.CPT_MENU_OLD", "MENU_CODE", "MENU_LIBELLE");
+        assertTrue(sql.contains("1 AS REF_RANG FROM TRESO.CPT_MENU WHERE"));
+        assertTrue(sql.contains("2 AS REF_RANG FROM TRESO.CPT_MENU_NEW WHERE"));
+        assertTrue(sql.contains("3 AS REF_RANG FROM TRESO.CPT_MENU_OLD WHERE"));
+        assertEquals(2, sql.split(" UNION ALL ", -1).length - 1);
+        assertTrue(sql.endsWith(") ORDER BY REF_RANG"));
     }
 
     @Test
@@ -147,7 +160,15 @@ public class CatalogueCalculateurTest {
         assertThrows(IllegalStateException.class, () ->
                 ReferentielApplicationsConfig.construireRequete("TRESO.CPT_MENU; DROP TABLE X", "A", "B"));
         assertThrows(IllegalStateException.class, () ->
+                ReferentielApplicationsConfig.construireRequete("TRESO.CPT_MENU,X;DROP", "A", "B"));
+        assertThrows(IllegalStateException.class, () ->
                 ReferentielApplicationsConfig.construireRequete("A.B.C", "A", "B"));
+        assertThrows(IllegalStateException.class, () ->
+                ReferentielApplicationsConfig.construireRequete("T,", "A", "B"));
+        assertThrows(IllegalStateException.class, () ->
+                ReferentielApplicationsConfig.construireRequete("  ", "A", "B"));
+        assertThrows(IllegalStateException.class, () ->
+                ReferentielApplicationsConfig.construireRequete(null, "A", "B"));
         assertThrows(IllegalStateException.class, () ->
                 ReferentielApplicationsConfig.construireRequete("T", "A) FROM DUAL --", "B"));
         assertThrows(IllegalStateException.class, () ->
@@ -156,5 +177,52 @@ public class CatalogueCalculateurTest {
                 ReferentielApplicationsConfig.construireRequete("T", "A", null));
         assertThrows(IllegalStateException.class, () ->
                 ReferentielApplicationsConfig.construireRequete("T", " A", "B"));
+    }
+
+    @Test
+    public void uuidRattacheAUnCodeDuReferentielDonneExistanteDocumentee() {
+        Map<String, String> ref = new LinkedHashMap<>();
+        ref.put("SIG22", "SIG");
+        ref.put("TTR", "sigi");
+        String uuid = "550E8400-E29B-41D4-A716-446655440002";
+        Objet o1 = objet(uuid, "SIG", "T1");
+        o1.appCodeRef = "sig22";
+        Objet o2 = objet(uuid, "SIG", "T2");
+        o2.appCodeRef = "SIG22";
+        List<Application> docs = Collections.singletonList(new Application(uuid, "Système d'Information Géographique", ""));
+
+        List<ApplicationCatalogue> res = CatalogueCalculateur.fusionner(ref, docs, Arrays.asList(o1, o2), new HashSet<>(), null);
+
+        assertEquals(2, res.size());
+        assertNull(trouver(res, uuid));
+        ApplicationCatalogue app = trouver(res, "SIG22");
+        assertEquals("EXISTANTE_DOCUMENTEE", app.statut);
+        assertEquals(2, app.nbObjets);
+        assertEquals("EXISTANTE_NON_DOCUMENTEE", trouver(res, "TTR").statut);
+    }
+
+    @Test
+    public void uuidSansCodeReferentielResteEnConceptionAvecSonLibelle() {
+        String uuid = "550E8400-E29B-41D4-A716-446655440001";
+        List<Application> docs = Collections.singletonList(new Application(uuid, "Gestion des Prêts et Avances", ""));
+
+        List<ApplicationCatalogue> res = CatalogueCalculateur.fusionner(
+                new LinkedHashMap<>(), docs, Collections.singletonList(objet(uuid, "DRH", "T1")), new HashSet<>(), null);
+
+        assertEquals(1, res.size());
+        assertEquals("EN_CONCEPTION", res.get(0).statut);
+        assertEquals(uuid, res.get(0).code);
+        assertEquals("Gestion des Prêts et Avances", res.get(0).libelle);
+    }
+
+    @Test
+    public void codeEffectifPrefereLeCodeReferentiel() {
+        Objet o = objet("550e8400-e29b", "DRH", "T");
+        assertEquals("550E8400-E29B", CatalogueCalculateur.codeEffectif(o));
+        o.appCodeRef = " man10 ";
+        assertEquals("MAN10", CatalogueCalculateur.codeEffectif(o));
+        o.appCode = null;
+        o.appCodeRef = "  ";
+        assertNull(CatalogueCalculateur.codeEffectif(o));
     }
 }

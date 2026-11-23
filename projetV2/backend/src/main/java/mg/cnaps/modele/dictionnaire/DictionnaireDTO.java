@@ -60,6 +60,8 @@ public final class DictionnaireDTO {
         public Boolean referentiel;
         public String appCode;
         public String appLibelle;
+        /** Code de l'application existante du référentiel (IAM.DICO_DATA_TABLE.APP_CODE_REF), ou null. */
+        public String appCodeRef;
 
         public Objet(String schema, String nom, String type, String description, int nombreColonnes) {
             this.schema = schema;
