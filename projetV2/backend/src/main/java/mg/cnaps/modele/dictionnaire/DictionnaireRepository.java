@@ -335,8 +335,44 @@ public class DictionnaireRepository {
         // Lève IllegalStateException si table/colonnes configurées sont dangereuses : volontairement non rattrapé.
         String sqlReferentiel = referentielConfig.requete();
 
+        Map<String, String> referentiel = lireReferentiel(sqlReferentiel);
+        boolean referentielDisponible = referentiel != null;
+        if (referentiel == null) referentiel = new LinkedHashMap<>();
+
+        Set<String> existantsOracle = objetsExistantsOracle();
+        List<ApplicationCatalogue> applications = CatalogueCalculateur.fusionner(
+                referentiel, applications(), objets(null, null, null), existantsOracle, statutFiltre);
+        return new ReponseCatalogue(referentielDisponible, existantsOracle != null, applications);
+    }
+
+    /** Durée de validité du référentiel en mémoire : il change très rarement et sa lecture coûte environ 1 s. */
+    private static final long DUREE_CACHE_REFERENTIEL_MS = 60_000L;
+
+    /** Instantané immuable du dernier référentiel lu avec succès. Les échecs ne sont jamais mis en cache. */
+    private static final class CacheReferentiel {
+        final String requete;
+        final long expireA;
+        final Map<String, String> donnees;
+
+        CacheReferentiel(String requete, long expireA, Map<String, String> donnees) {
+            this.requete = requete;
+            this.expireA = expireA;
+            this.donnees = donnees;
+        }
+    }
+
+    private volatile CacheReferentiel cacheReferentiel;
+
+    /**
+     * Code normalisé -> libellé, ou null si le référentiel est illisible (le catalogue le signale alors via
+     * referentielDisponible=false). Mis en cache 60 s : la requête est identique pour tous les appels.
+     */
+    private Map<String, String> lireReferentiel(String sqlReferentiel) {
+        CacheReferentiel c = cacheReferentiel;
+        if (c != null && c.requete.equals(sqlReferentiel) && System.currentTimeMillis() < c.expireA) {
+            return new LinkedHashMap<>(c.donnees);
+        }
         Map<String, String> referentiel = new LinkedHashMap<>();
-        boolean referentielDisponible = true;
         try {
             // Sources validées sur la base : DEV_DEPL lit TRESO.CPT_MENU, CPT_MENU_NEW et CPT_MENU_OLD.
             jdbc.query(sqlReferentiel, rs -> {
@@ -349,14 +385,12 @@ public class DictionnaireRepository {
         } catch (DataAccessException e) {
             LOG.warn("Référentiel des applications illisible ({}) : catalogue calculé avec un référentiel vide. Cause : {}",
                     sqlReferentiel, e.getMessage());
-            referentiel.clear();
-            referentielDisponible = false;
+            cacheReferentiel = null;
+            return null;
         }
-
-        Set<String> existantsOracle = objetsExistantsOracle();
-        List<ApplicationCatalogue> applications = CatalogueCalculateur.fusionner(
-                referentiel, applications(), objets(null, null, null), existantsOracle, statutFiltre);
-        return new ReponseCatalogue(referentielDisponible, existantsOracle != null, applications);
+        cacheReferentiel = new CacheReferentiel(sqlReferentiel,
+                System.currentTimeMillis() + DUREE_CACHE_REFERENTIEL_MS, new LinkedHashMap<>(referentiel));
+        return referentiel;
     }
 
     /** Objets documentés d'une application, avec leur statut CREE / NON_CREE. */
