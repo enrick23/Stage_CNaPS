@@ -1,0 +1,50 @@
+@use '../../styles/theme' as theme;
+
+:host(.routed-object) {
+  display: block;
+}
+
+:host(.routed-object) .detail-heading {
+  @include theme.card;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 20px 22px;
+}
+
+:host(.routed-object) .tabs {
+  gap: 3px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+}
+
+:host(.routed-object) .tabs button {
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding: 8px 13px;
+}
+
+:host(.routed-object) .column-table {
+  @include theme.data-table;
+  min-width: 900px;
+  font-size: 12px;
+}
+
+:host(.routed-object) .panel {
+  overflow-x: auto;
+}
+
+:host(.routed-object) .script {
+  overflow: auto;
+}
+
+:host(.routed-object) .detail-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  :host(.routed-object) .detail-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 16px;
+  }
+}

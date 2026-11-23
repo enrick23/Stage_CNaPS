@@ -1,14 +1,18 @@
-<section>
-  <header>
-    <h2>Catalogue des applications</h2>
+<section class="catalogue-page">
+  <header class="catalogue-heading">
+    <div>
+      <p class="eyebrow">Dictionnaire de données</p>
+      <h1>Catalogue des applications</h1>
+      <p class="page-intro">Parcours les applications et leurs objets documentés.</p>
+    </div>
     <p>
-      <a [routerLink]="['/dictionnaire/documenter']" [queryParams]="{ mode: 'formulaire' }">
+      <a class="button-primary" [routerLink]="['/dictionnaire/documenter']" [queryParams]="{ mode: 'formulaire' }">
         Nouvelle application
       </a>
     </p>
   </header>
 
-  <div>
+  <div class="catalogue-toolbar">
     <label for="recherche-catalogue">Rechercher une application (code ou libellé) :</label>
     <input
       id="recherche-catalogue"
@@ -19,9 +23,10 @@
     />
   </div>
 
-  <div role="group" aria-label="Filtrer par statut d'application">
+  <div class="status-filters" role="group" aria-label="Filtrer par statut d'application">
     <button
       type="button"
+      class="filter-chip"
       [class.active]="statutFiltre === ''"
       (click)="choisirStatut('')"
     >
@@ -29,6 +34,7 @@
     </button>
     <button
       type="button"
+      class="filter-chip"
       [class.active]="statutFiltre === 'EXISTANTE_DOCUMENTEE'"
       (click)="choisirStatut('EXISTANTE_DOCUMENTEE')"
     >
@@ -36,6 +42,7 @@
     </button>
     <button
       type="button"
+      class="filter-chip"
       [class.active]="statutFiltre === 'EN_CONCEPTION'"
       (click)="choisirStatut('EN_CONCEPTION')"
     >
@@ -43,6 +50,7 @@
     </button>
     <button
       type="button"
+      class="filter-chip"
       [class.active]="statutFiltre === 'EXISTANTE_NON_DOCUMENTEE'"
       (click)="choisirStatut('EXISTANTE_NON_DOCUMENTEE')"
     >
@@ -50,69 +58,92 @@
     </button>
   </div>
 
-  <p *ngIf="!chargement && !erreur && !referentielDisponible">
+  <p class="notice notice-warning" *ngIf="!chargement && !erreur && !referentielDisponible" role="status">
     Le référentiel officiel des applications est illisible : les statuts affichés ne sont pas fiables.
   </p>
-  <p *ngIf="!chargement && !erreur && !catalogueOracleDisponible">
+  <p class="notice notice-info" *ngIf="!chargement && !erreur && !catalogueOracleDisponible" role="status">
     Le catalogue Oracle est indisponible : la colonne « Couverture » n'est pas fiable.
   </p>
 
-  <p *ngIf="chargement">Chargement du catalogue des applications…</p>
-  <p *ngIf="erreur">{{ erreur }}</p>
+  <div class="loading-state" *ngIf="chargement" role="status">
+    <span class="loading-spinner" aria-hidden="true"></span>
+    <p>Chargement du catalogue des applications…</p>
+  </div>
+  <p class="notice notice-error" *ngIf="erreur" role="alert">{{ erreur }}</p>
 
   <ng-container *ngIf="!chargement && !erreur">
-    <p *ngIf="applicationsFiltrees.length === 0">
+    <div class="empty-state" *ngIf="applicationsFiltrees.length === 0">
+      <h2>Aucun résultat</h2>
       Aucune application ne correspond aux critères sélectionnés.
-    </p>
+    </div>
 
     <ng-container *ngIf="applicationsFiltrees.length > 0">
-      <p>
+      <p class="results-summary">
         {{ applicationsFiltrees.length }} application(s) trouvée(s) — Page {{ pageCourante }} sur {{ totalPages }}
       </p>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Application</th>
-            <th>Statut</th>
-            <th>Schémas</th>
-            <th>Objets documentés</th>
-            <th>Couverture (créés / documentés)</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let app of applicationsPaginees">
-            <td>
-              <a [routerLink]="['/dictionnaire/catalogue', app.code]">
-                <strong>{{ app.code }}</strong> — {{ app.libelle }}
-              </a>
-            </td>
-            <td>{{ libelleStatut(app.statut) }}</td>
-            <td>{{ app.schemas.length ? app.schemas.join(', ') : '—' }}</td>
-            <td>{{ app.nbObjets }}</td>
-            <td>{{ app.nbObjetsCrees }} / {{ app.nbObjets }}</td>
-            <td>
-              <a
-                *ngIf="estApplicationExistante(app.statut)"
-                [routerLink]="['/dictionnaire/documenter']"
-                [queryParams]="{ mode: 'ia', application: app.code }"
-              >
-                Documenter avec l'IA
-              </a>
-              <a
-                *ngIf="app.statut === 'EN_CONCEPTION'"
-                [routerLink]="['/dictionnaire/documenter']"
-                [queryParams]="{ mode: 'formulaire', application: app.code }"
-              >
-                Continuer la saisie
-              </a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="catalogue-card">
+        <div class="table-scroll">
+          <table class="catalogue-table">
+            <thead>
+              <tr>
+                <th>Application</th>
+                <th>Statut</th>
+                <th>Schémas</th>
+                <th>Objets documentés</th>
+                <th>Couverture (créés / documentés)</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let app of applicationsPaginees">
+                <td>
+                  <a class="application-link" [routerLink]="['/dictionnaire/catalogue', app.code]">
+                    <strong>{{ app.code }}</strong>
+                    <span>{{ app.libelle }}</span>
+                  </a>
+                </td>
+                <td>
+                  <span class="status-badge"
+                    [class.status-documented]="app.statut === 'EXISTANTE_DOCUMENTEE'"
+                    [class.status-undocumented]="app.statut === 'EXISTANTE_NON_DOCUMENTEE'"
+                    [class.status-design]="app.statut === 'EN_CONCEPTION'">
+                    {{ libelleStatut(app.statut) }}
+                  </span>
+                </td>
+                <td>{{ app.schemas.length ? app.schemas.join(', ') : '—' }}</td>
+                <td><span class="object-count">{{ app.nbObjets }}</span></td>
+                <td>
+                  <div class="coverage-cell">
+                    <span>{{ app.nbObjetsCrees }} / {{ app.nbObjets }}</span>
+                    <progress class="coverage-progress"
+                      [value]="app.nbObjets > 0 ? app.nbObjetsCrees : 0"
+                      [max]="app.nbObjets > 0 ? app.nbObjets : 1"
+                      [attr.aria-label]="'Couverture Oracle : ' + app.nbObjetsCrees + ' objets créés sur ' + app.nbObjets">
+                    </progress>
+                  </div>
+                </td>
+                <td class="action-cell">
+                  <a class="button-secondary"
+                    *ngIf="estApplicationExistante(app.statut)"
+                    [routerLink]="['/dictionnaire/documenter']"
+                    [queryParams]="{ mode: 'ia', application: app.code }">
+                    Documenter avec l'IA
+                  </a>
+                  <a class="button-secondary"
+                    *ngIf="app.statut === 'EN_CONCEPTION'"
+                    [routerLink]="['/dictionnaire/documenter']"
+                    [queryParams]="{ mode: 'formulaire', application: app.code }">
+                    Continuer la saisie
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      <nav aria-label="Pagination du catalogue" *ngIf="totalPages > 1">
+      <nav class="catalogue-pagination" aria-label="Pagination du catalogue" *ngIf="totalPages > 1">
         <button
           type="button"
           [disabled]="pageCourante <= 1"

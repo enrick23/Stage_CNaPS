@@ -18,6 +18,7 @@ import { CatalogueService } from '../../services/catalogue.service';
 @Component({
   selector: 'app-dictionnaire-fiche-application',
   templateUrl: './fiche-application.component.html',
+  styleUrls: ['./fiche-application.component.scss'],
 })
 export class FicheApplicationComponent implements OnInit, OnDestroy {
   codeApplication = '';

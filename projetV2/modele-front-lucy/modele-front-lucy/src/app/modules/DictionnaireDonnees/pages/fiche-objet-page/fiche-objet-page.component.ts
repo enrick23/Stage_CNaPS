@@ -19,6 +19,7 @@ import { DicoDetailObjet, DicoObjet, DictionnaireService } from '../../services/
 @Component({
   selector: 'app-dictionnaire-fiche-objet-page',
   templateUrl: './fiche-objet-page.component.html',
+  styleUrls: ['./fiche-objet-page.component.scss'],
 })
 export class FicheObjetPageComponent implements OnInit, OnDestroy {
   application = '';

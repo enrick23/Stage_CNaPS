@@ -1,5 +1,5 @@
-<section>
-  <nav aria-label="Fil d'Ariane">
+<section class="routed-object-page">
+  <nav class="breadcrumb" aria-label="Fil d'Ariane">
     <a routerLink="/dictionnaire/catalogue">Catalogue</a>
     &gt;
     <a [routerLink]="['/dictionnaire/catalogue', application]">{{ libelleApplication || application }}</a>
@@ -23,6 +23,7 @@
 
   <app-fiche-objet
     *ngIf="!chargement && detail"
+    class="routed-object"
     [detail]="detail"
     [appLibelle]="libelleApplication"
     [objets]="objetsConnus"

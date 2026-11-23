@@ -1,0 +1,120 @@
+@mixin controls {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid rgba(11, 92, 173, 0.35);
+    outline-offset: 2px;
+  }
+}
+
+@mixin card {
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+@mixin badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+@mixin data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+
+  th {
+    padding: 12px 14px;
+    background: #f1f5f9;
+    color: #334155;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 13px 14px;
+    border-bottom: 1px solid #edf1f5;
+    color: #334155;
+    vertical-align: middle;
+  }
+
+  tbody tr:hover td {
+    background: #f8fbff;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+@mixin alert {
+  padding: 12px 16px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@mixin primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--b, #0b5cad);
+  border-radius: 7px;
+  background: var(--b, #0b5cad);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--bd, #07417d);
+    background: var(--bd, #07417d);
+  }
+}
+
+@mixin secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--bd, #07417d);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--bl, #e8f1fa);
+  }
+}

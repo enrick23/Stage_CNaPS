@@ -23,6 +23,7 @@ const STATUTS_VALIDES: StatutApplication[] = [
 @Component({
   selector: 'app-dictionnaire-catalogue',
   templateUrl: './catalogue.component.html',
+  styleUrls: ['./catalogue.component.scss'],
 })
 export class CatalogueComponent implements OnInit, OnDestroy {
   readonly taillePage = 25;

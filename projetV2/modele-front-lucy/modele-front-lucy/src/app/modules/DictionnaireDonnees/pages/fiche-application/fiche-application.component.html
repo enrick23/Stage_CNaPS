@@ -1,15 +1,29 @@
-<section>
-  <p><a routerLink="/dictionnaire/catalogue">Retour au catalogue</a></p>
+<section class="application-page">
+  <nav class="breadcrumb" aria-label="Fil d'Ariane">
+    <a routerLink="/dictionnaire/catalogue">Catalogue</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ application ? application.libelle : codeApplication }}</span>
+  </nav>
 
-  <p *ngIf="chargement">Chargement de la fiche application…</p>
-  <p *ngIf="erreur">{{ erreur }}</p>
+  <div class="loading-state" *ngIf="chargement" role="status">Chargement de la fiche application…</div>
+  <p class="notice notice-error" *ngIf="erreur" role="alert">{{ erreur }}</p>
 
   <ng-container *ngIf="!chargement && application">
-    <header>
-      <h2>{{ application.libelle }} ({{ application.code }})</h2>
+    <header class="application-heading">
+      <div>
+        <p class="eyebrow">Fiche application</p>
+        <h1>{{ application.libelle }}</h1>
+        <code>{{ application.code }}</code>
+      </div>
+      <span class="status-badge"
+        [class.status-documented]="application.statut === 'EXISTANTE_DOCUMENTEE'"
+        [class.status-undocumented]="application.statut === 'EXISTANTE_NON_DOCUMENTEE'"
+        [class.status-design]="application.statut === 'EN_CONCEPTION'">
+        {{ libelleStatutApplication(application.statut) }}
+      </span>
     </header>
 
-    <dl>
+    <dl class="application-facts">
       <div>
         <dt>Code</dt>
         <dd>{{ application.code }}</dd>
@@ -19,21 +33,25 @@
         <dd>{{ application.libelle }}</dd>
       </div>
       <div>
-        <dt>Statut</dt>
-        <dd>{{ libelleStatutApplication(application.statut) }}</dd>
-      </div>
-      <div>
         <dt>Schémas Oracle</dt>
         <dd>{{ application.schemas.length ? application.schemas.join(', ') : '—' }}</dd>
       </div>
       <div>
         <dt>Couverture Oracle</dt>
-        <dd>{{ application.nbObjetsCrees }} / {{ application.nbObjets }} objet(s) créé(s) dans Oracle</dd>
+        <dd>
+          <span>{{ application.nbObjetsCrees }} / {{ application.nbObjets }} objet(s) créé(s) dans Oracle</span>
+          <progress class="coverage-progress"
+            [value]="application.nbObjets > 0 ? application.nbObjetsCrees : 0"
+            [max]="application.nbObjets > 0 ? application.nbObjets : 1"
+            [attr.aria-label]="'Couverture Oracle : ' + application.nbObjetsCrees + ' objets créés sur ' + application.nbObjets">
+          </progress>
+        </dd>
       </div>
     </dl>
 
-    <p>
+    <div class="application-actions">
       <a
+        class="button-primary"
         *ngIf="estApplicationExistante(application.statut)"
         [routerLink]="['/dictionnaire/documenter']"
         [queryParams]="{ mode: 'ia', application: application.code }"
@@ -41,41 +59,58 @@
         Documenter avec l'IA
       </a>
       <a
+        class="button-primary"
         *ngIf="application.statut === 'EN_CONCEPTION'"
         [routerLink]="['/dictionnaire/documenter']"
         [queryParams]="{ mode: 'formulaire', application: application.code }"
       >
         Continuer la saisie
       </a>
-    </p>
+    </div>
 
-    <h3>Objets documentés ({{ objets.length }})</h3>
+    <div class="objects-heading">
+      <h2>Objets documentés</h2>
+      <span>{{ objets.length }}</span>
+    </div>
 
-    <p *ngIf="objets.length === 0">
+    <div class="empty-state" *ngIf="objets.length === 0">
+      <h3>Aucun objet documenté</h3>
       Aucun objet n'est encore documenté pour cette application.
-    </p>
+    </div>
 
-    <table *ngIf="objets.length > 0">
-      <thead>
-        <tr>
-          <th>Objet</th>
-          <th>Schéma</th>
-          <th>Type</th>
-          <th>Statut Oracle</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let obj of objets">
-          <td>
-            <a [routerLink]="['/dictionnaire/catalogue', application.code, obj.schema, obj.nom]">{{ obj.schema }}.{{ obj.nom }}</a>
-          </td>
-          <td>{{ obj.schema }}</td>
-          <td>{{ obj.type === 'VIEW' ? 'Vue' : 'Table' }}</td>
-          <td>{{ libelleStatutObjet(obj.statut) }}</td>
-          <td>{{ obj.description || '—' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="application-card" *ngIf="objets.length > 0">
+      <div class="table-scroll">
+        <table class="application-table">
+          <thead>
+            <tr>
+              <th>Objet</th>
+              <th>Schéma</th>
+              <th>Type</th>
+              <th>Statut Oracle</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let obj of objets">
+              <td>
+                <a class="object-link" [routerLink]="['/dictionnaire/catalogue', application.code, obj.schema, obj.nom]">
+                  {{ obj.schema }}.{{ obj.nom }}
+                </a>
+              </td>
+              <td>{{ obj.schema }}</td>
+              <td>{{ obj.type === 'VIEW' ? 'Vue' : 'Table' }}</td>
+              <td>
+                <span class="status-badge"
+                  [class.object-created]="obj.statut === 'CREE'"
+                  [class.object-pending]="obj.statut === 'NON_CREE'">
+                  {{ libelleStatutObjet(obj.statut) }}
+                </span>
+              </td>
+              <td>{{ obj.description || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </ng-container>
 </section>

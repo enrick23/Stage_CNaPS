@@ -1,0 +1,44 @@
+@use '../../styles/theme' as theme;
+
+:host {
+  display: block;
+}
+
+.routed-object-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  color: #1e293b;
+
+  @include theme.controls;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 18px;
+  color: var(--t2);
+  font-size: 12px;
+
+  a {
+    color: var(--b);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+}
+
+.routed-object-page > p {
+  margin: 0 0 12px;
+}
+
+.routed-object-page > p[role='alert'] {
+  @include theme.alert;
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+}

@@ -21,7 +21,10 @@ export const ONGLETS_FICHE_OBJET: OngletFicheObjet[] = ['colonnes', 'triggers', 
 @Component({
   selector: 'app-fiche-objet',
   templateUrl: './fiche-objet.component.html',
-  styleUrls: ['../../pages/dictionnaire-donnees/dictionnaire-donnees.component.scss'],
+  styleUrls: [
+    '../../pages/dictionnaire-donnees/dictionnaire-donnees.component.scss',
+    './fiche-objet-routed.component.scss',
+  ],
 })
 export class FicheObjetComponent {
   /** Structure complète de l'objet affiché. */

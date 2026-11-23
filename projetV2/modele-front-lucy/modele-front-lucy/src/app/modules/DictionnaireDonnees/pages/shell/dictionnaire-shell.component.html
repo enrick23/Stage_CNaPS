@@ -1,21 +1,23 @@
-<nav aria-label="Navigation du dictionnaire de données">
-  <ul>
-    <li>
-      <a routerLink="/dictionnaire" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
-    </li>
-    <li>
-      <a routerLink="/dictionnaire/catalogue" routerLinkActive="active">Catalogue</a>
-    </li>
-    <li>
-      <a routerLink="/dictionnaire/documenter" routerLinkActive="active">Documenter</a>
-    </li>
-    <li>
-      <a routerLink="/dictionnaire/export" routerLinkActive="active">Export</a>
-    </li>
-    <li>
-      <a routerLink="/dictionnaire/ancien" routerLinkActive="active">Ancienne version</a>
-    </li>
-  </ul>
-</nav>
+<div class="dictionary-shell" [class.legacy-version]="ancienneVersion">
+  <nav class="dictionary-navigation" aria-label="Navigation du dictionnaire de données">
+    <ul>
+      <li>
+        <a routerLink="/dictionnaire" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
+      </li>
+      <li>
+        <a routerLink="/dictionnaire/catalogue" routerLinkActive="active">Catalogue</a>
+      </li>
+      <li>
+        <a routerLink="/dictionnaire/documenter" routerLinkActive="active">Documenter</a>
+      </li>
+      <li>
+        <a routerLink="/dictionnaire/export" routerLinkActive="active">Export</a>
+      </li>
+      <li>
+        <a class="legacy-link" routerLink="/dictionnaire/ancien" routerLinkActive="active">Ancienne version</a>
+      </li>
+    </ul>
+  </nav>
 
-<router-outlet></router-outlet>
+  <router-outlet></router-outlet>
+</div>
