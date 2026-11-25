@@ -1,6 +1,6 @@
 <section class="documenter-page">
   <nav class="breadcrumb" aria-label="Fil d'Ariane">
-    <a routerLink="/dictionnaire/catalogue">Catalogue</a>
+    <a routerLink="/dictionnaire">Catalogue</a>
     <span aria-hidden="true">/</span>
     <span>Documenter</span>
   </nav>
@@ -13,7 +13,7 @@
         L'assistant IA aide à documenter une application déjà utilisée. Le formulaire sert à concevoir une nouvelle application avant sa création.
       </p>
     </div>
-    <a class="button-secondary" routerLink="/dictionnaire/catalogue">Retour au catalogue</a>
+    <a class="button-secondary" routerLink="/dictionnaire">Retour au catalogue</a>
   </header>
 
   <nav class="mode-tabs" aria-label="Choisir le parcours de documentation">
@@ -422,7 +422,7 @@
       </section>
 
       <footer class="form-actions">
-        <button type="button" class="button-secondary" routerLink="/dictionnaire/catalogue">Annuler</button>
+        <button type="button" class="button-secondary" routerLink="/dictionnaire">Annuler</button>
         <button type="submit" class="button-primary" [disabled]="enregistrementFormulaireEnCours || !!erreurSchemas">
           {{ enregistrementFormulaireEnCours ? 'Enregistrement…' : 'Enregistrer cet objet' }}
         </button>
@@ -434,7 +434,7 @@
         <strong>Application en conception</strong>
         <span>{{ appLibelleConception }} · APP_ID : {{ appCodeConception }}</span>
       </div>
-      <a class="button-secondary" [routerLink]="['/dictionnaire/catalogue', appCodeConception]">Voir la fiche application</a>
+      <a class="button-secondary" [routerLink]="['/dictionnaire', appCodeConception]">Voir la fiche application</a>
       <button type="button" class="text-button" (click)="preparerAutreObjet()">Documenter un autre objet</button>
     </div>
   </ng-container>

@@ -50,3 +50,18 @@ export interface ObjetCatalogue {
   statut: StatutObjet;
   description: string;
 }
+
+/** Libellé affiché d'un statut d'application (les codes techniques restent côté code). */
+export function libelleStatutApplication(statut: StatutApplication): string {
+  switch (statut) {
+    case 'EXISTANTE_DOCUMENTEE':
+      return 'Documentée';
+    case 'EN_CONCEPTION':
+      return 'En conception';
+    default:
+      return 'À documenter';
+  }
+}
+
+/** Segments d'URL réservés sous /dictionnaire : un code d'application identique serait masqué par la route correspondante. */
+export const SEGMENTS_RESERVES: string[] = ['nouvelle', 'ancien', 'catalogue', 'documenter', 'export'];

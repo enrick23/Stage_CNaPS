@@ -1,0 +1,37 @@
+<h2>Objets</h2>
+
+<p role="status" aria-live="polite" *ngIf="chargement">Chargement des objets…</p>
+<p class="notice notice-error" role="alert" *ngIf="erreur">{{ erreur }}</p>
+
+<p *ngIf="!chargement && !erreur && objets.length === 0">Aucun objet documenté pour cette application.</p>
+
+<div class="table-scroll" *ngIf="objets.length > 0">
+  <table class="application-table">
+    <thead>
+      <tr>
+        <th>Objet</th>
+        <th>Type</th>
+        <th>Dans Oracle</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let obj of objets">
+        <td>
+          <a class="object-link" [routerLink]="['/dictionnaire', code, 'objets', obj.schema, obj.nom]">
+            {{ obj.schema }}.{{ obj.nom }}
+          </a>
+        </td>
+        <td>{{ obj.type === 'VIEW' ? 'Vue' : 'Table' }}</td>
+        <td>
+          <span class="status-badge"
+            [class.object-created]="obj.statut === 'CREE'"
+            [class.object-pending]="obj.statut === 'NON_CREE'">
+            {{ obj.statut === 'CREE' ? 'Créée' : 'Pas encore créée' }}
+          </span>
+        </td>
+        <td>{{ obj.description || '—' }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

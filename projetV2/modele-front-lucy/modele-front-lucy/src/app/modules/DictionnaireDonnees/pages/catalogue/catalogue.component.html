@@ -6,7 +6,7 @@
       <p class="page-intro">Parcours les applications et leurs objets documentés.</p>
     </div>
     <p>
-      <a class="button-primary" [routerLink]="['/dictionnaire/documenter']" [queryParams]="{ mode: 'formulaire' }">
+      <a class="button-primary" routerLink="/dictionnaire/nouvelle">
         Nouvelle application
       </a>
     </p>
@@ -98,7 +98,7 @@
             <tbody>
               <tr *ngFor="let app of applicationsPaginees">
                 <td>
-                  <a class="application-link" [routerLink]="['/dictionnaire/catalogue', app.code]">
+                  <a class="application-link" [routerLink]="['/dictionnaire', app.code]">
                     <strong>{{ app.code }}</strong>
                     <span>{{ app.libelle }}</span>
                   </a>
@@ -126,14 +126,12 @@
                 <td class="action-cell">
                   <a class="button-secondary"
                     *ngIf="estApplicationExistante(app.statut)"
-                    [routerLink]="['/dictionnaire/documenter']"
-                    [queryParams]="{ mode: 'ia', application: app.code }">
+                    [routerLink]="['/dictionnaire', app.code, 'documenter']">
                     Documenter avec l'IA
                   </a>
                   <a class="button-secondary"
                     *ngIf="app.statut === 'EN_CONCEPTION'"
-                    [routerLink]="['/dictionnaire/documenter']"
-                    [queryParams]="{ mode: 'formulaire', application: app.code }">
+                    [routerLink]="['/dictionnaire', app.code, 'documenter']">
                     Continuer la saisie
                   </a>
                 </td>

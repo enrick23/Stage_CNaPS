@@ -1,0 +1,146 @@
+@use '../../styles/theme' as theme;
+
+:host {
+  display: block;
+}
+
+.application-layout {
+  max-width: 1440px;
+  margin: 0 auto;
+  color: #1e293b;
+
+  @include theme.controls;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 16px;
+  color: var(--t2);
+  font-size: 13px;
+
+  a {
+    color: var(--b);
+    text-decoration: underline;
+  }
+}
+
+.notice {
+  @include theme.alert;
+  margin: 0 0 16px;
+}
+
+.notice-warning {
+  border-color: #fde68a;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.state-message {
+  @include theme.card;
+  padding: 22px 24px;
+
+  p {
+    margin: 0 0 10px;
+  }
+
+  .button-secondary {
+    margin-right: 8px;
+  }
+}
+
+.application-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+
+.side-card {
+  @include theme.card;
+  padding: 18px;
+
+  h2 {
+    margin: 0 0 4px;
+    color: #0f172a;
+    font-size: 20px;
+    line-height: 1.25;
+  }
+}
+
+.side-code {
+  margin: 0 0 10px;
+  color: var(--t2);
+  font-size: 13px;
+}
+
+.status-badge {
+  @include theme.badge;
+}
+
+.status-documented {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-undocumented {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.status-design {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.side-summary {
+  margin: 12px 0 14px;
+  color: var(--t2);
+  font-size: 13px;
+}
+
+.side-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 8px;
+    color: #334155;
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      background: #f1f5f9;
+    }
+
+    &[aria-current='page'] {
+      background: var(--bl);
+      color: var(--bd);
+    }
+  }
+}
+
+.button-secondary {
+  @include theme.secondary-button;
+  min-height: 44px;
+}
+
+.application-content {
+  @include theme.card;
+  min-width: 0;
+  padding: 26px;
+}
+
+@media (max-width: 900px) {
+  .application-grid {
+    grid-template-columns: 1fr;
+  }
+}

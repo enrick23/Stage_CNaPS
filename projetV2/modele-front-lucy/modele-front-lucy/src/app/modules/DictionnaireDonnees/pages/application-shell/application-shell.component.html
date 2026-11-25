@@ -1,0 +1,62 @@
+<section class="application-layout">
+  <ng-container *ngIf="etat$ | async as etat">
+    <nav class="breadcrumb" aria-label="Fil d'Ariane">
+      <a routerLink="/dictionnaire">Applications</a>
+      <span aria-hidden="true">›</span>
+      <span>{{ etat.application ? etat.application.libelle : etat.code }}</span>
+    </nav>
+
+    <p class="notice notice-warning" role="status"
+      *ngIf="!etat.chargement && (!etat.referentielDisponible || !etat.catalogueOracleDisponible)">
+      <ng-container *ngIf="!etat.referentielDisponible">
+        Le référentiel des applications est indisponible : les statuts affichés ne sont pas fiables.
+      </ng-container>
+      <ng-container *ngIf="etat.referentielDisponible && !etat.catalogueOracleDisponible">
+        Le catalogue Oracle est indisponible : les compteurs « créés dans Oracle » ne sont pas fiables.
+      </ng-container>
+    </p>
+
+    <p class="state-message" role="status" aria-live="polite" *ngIf="etat.chargement">Chargement de l’application…</p>
+
+    <div class="state-message" role="alert" *ngIf="!etat.chargement && etat.erreur">
+      <p>{{ etat.erreur }}</p>
+      <p>
+        <button type="button" class="button-secondary" (click)="recharger()">Réessayer</button>
+        <a class="button-secondary" routerLink="/dictionnaire">Retour aux applications</a>
+      </p>
+    </div>
+
+    <div class="state-message" role="alert" *ngIf="!etat.chargement && !etat.erreur && !etat.application">
+      <p>Aucune application trouvée avec le code « {{ etat.code }} ».</p>
+      <p><a class="button-secondary" routerLink="/dictionnaire">Retour aux applications</a></p>
+    </div>
+
+    <div class="application-grid" *ngIf="etat.application as app">
+      <aside class="side-card">
+        <h2>{{ app.libelle }}</h2>
+        <p class="side-code">{{ app.code }}</p>
+        <span class="status-badge"
+          [class.status-documented]="app.statut === 'EXISTANTE_DOCUMENTEE'"
+          [class.status-undocumented]="app.statut === 'EXISTANTE_NON_DOCUMENTEE'"
+          [class.status-design]="app.statut === 'EN_CONCEPTION'">{{ libelleStatut(app) }}</span>
+        <p class="side-summary">{{ resume(app) }}</p>
+
+        <nav class="side-menu" aria-label="Sections de l’application">
+          <a [routerLink]="['/dictionnaire', app.code, 'objets']" routerLinkActive #rlaObjets="routerLinkActive"
+            [attr.aria-current]="rlaObjets.isActive ? 'page' : null">Objets</a>
+          <a [routerLink]="['/dictionnaire', app.code, 'documenter']" routerLinkActive #rlaDoc="routerLinkActive"
+            [attr.aria-current]="rlaDoc.isActive ? 'page' : null">Documenter</a>
+          <a *ngIf="app.statut === 'EN_CONCEPTION'" [routerLink]="['/dictionnaire', app.code, 'rattacher']"
+            routerLinkActive #rlaRatt="routerLinkActive"
+            [attr.aria-current]="rlaRatt.isActive ? 'page' : null">Rattacher</a>
+          <a [routerLink]="['/dictionnaire', app.code, 'export']" routerLinkActive #rlaExp="routerLinkActive"
+            [attr.aria-current]="rlaExp.isActive ? 'page' : null">Export</a>
+        </nav>
+      </aside>
+
+      <div class="application-content">
+        <router-outlet></router-outlet>
+      </div>
+    </div>
+  </ng-container>
+</section>

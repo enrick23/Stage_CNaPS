@@ -10,6 +10,13 @@ import { FicheApplicationComponent } from './pages/fiche-application/fiche-appli
 import { DocumenterComponent } from './pages/documenter/documenter.component';
 import { ExportComponent } from './pages/export/export.component';
 import { FicheObjetComponent } from './components/fiche-objet/fiche-objet.component';
+import { ApplicationShellComponent } from './pages/application-shell/application-shell.component';
+import { ObjetsApplicationComponent } from './pages/objets-application/objets-application.component';
+import { DocumenterApplicationComponent } from './pages/documenter-application/documenter-application.component';
+import { RattacherComponent } from './pages/rattacher/rattacher.component';
+import { ExportApplicationComponent } from './pages/export-application/export-application.component';
+import { NouvelleApplicationComponent } from './pages/nouvelle-application/nouvelle-application.component';
+import { RedirectionDocumenterComponent } from './pages/redirection-documenter/redirection-documenter.component';
 import { FicheObjetPageComponent } from './pages/fiche-objet-page/fiche-objet-page.component';
 
 @NgModule({
@@ -23,6 +30,13 @@ import { FicheObjetPageComponent } from './pages/fiche-objet-page/fiche-objet-pa
     ExportComponent,
     FicheObjetComponent,
     FicheObjetPageComponent,
+    ApplicationShellComponent,
+    ObjetsApplicationComponent,
+    DocumenterApplicationComponent,
+    RattacherComponent,
+    ExportApplicationComponent,
+    NouvelleApplicationComponent,
+    RedirectionDocumenterComponent,
   ],
   imports: [CommonModule, FormsModule, DictionnaireRoutingModule],
 })

@@ -1,11 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { forkJoin, of, Subscription } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { combineLatest, forkJoin, of, Subscription } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { ONGLETS_FICHE_OBJET, OngletFicheObjet } from '../../components/fiche-objet/fiche-objet.component';
 import { ApplicationCatalogue } from '../../models/catalogue.model';
-import { CatalogueService } from '../../services/catalogue.service';
+import { ApplicationContextService } from '../../services/application-context.service';
 import { DicoDetailObjet, DicoObjet, DictionnaireService } from '../../services/dictionnaire.service';
 
 /**
@@ -48,7 +48,7 @@ export class FicheObjetPageComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private dico: DictionnaireService,
-    private catalogueService: CatalogueService
+    private contexte: ApplicationContextService
   ) {}
 
   ngOnInit(): void {
@@ -58,8 +58,10 @@ export class FicheObjetPageComponent implements OnInit, OnDestroy {
     });
 
     // paramMap (et non snapshot) : le composant est réutilisé quand on suit une table référencée.
-    this.abonnementRoute = this.route.paramMap.subscribe((params) => {
-      this.application = (params.get('application') || '').trim().toUpperCase();
+    // :application vient de la route parente (coque d'application) ; :schema et :objet de cette route.
+    const parametresParent = this.route.parent ? this.route.parent.paramMap : of(convertToParamMap({}));
+    this.abonnementRoute = combineLatest([parametresParent, this.route.paramMap]).subscribe(([parent, params]) => {
+      this.application = (parent.get('application') || params.get('application') || '').trim().toUpperCase();
       this.schema = (params.get('schema') || '').trim().toUpperCase();
       this.objet = (params.get('objet') || '').trim().toUpperCase();
       this.charger();
@@ -95,12 +97,8 @@ export class FicheObjetPageComponent implements OnInit, OnDestroy {
   }
 
   editer(): void {
-    const statut = this.applicationCatalogue ? this.applicationCatalogue.statut : null;
-    // Même correspondance que le catalogue : application existante -> IA, en conception (ou inconnue) -> formulaire.
-    const mode = statut === 'EXISTANTE_DOCUMENTEE' || statut === 'EXISTANTE_NON_DOCUMENTEE' ? 'ia' : 'formulaire';
-    this.router.navigate(['/dictionnaire/documenter'], {
-      queryParams: { mode, application: this.application },
-    });
+    // Le mode (IA ou formulaire) est déduit du statut par l'onglet Documenter.
+    this.router.navigate(['/dictionnaire', this.application, 'documenter']);
   }
 
   exporter(): void {
@@ -134,7 +132,7 @@ export class FicheObjetPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.message = null;
-    this.router.navigate(['/dictionnaire/catalogue', code, s, t], { queryParams: { onglet: 'colonnes' } });
+    this.router.navigate(['/dictionnaire', code, 'objets', s, t], { queryParams: { onglet: 'colonnes' } });
   }
 
   private charger(): void {
@@ -156,7 +154,10 @@ export class FicheObjetPageComponent implements OnInit, OnDestroy {
     this.abonnementDonnees = forkJoin([
       this.dico.detail(this.schema, this.objet),
       // Données complémentaires : leur échec ne doit pas empêcher d'afficher la fiche.
-      this.catalogueService.listerApplications().pipe(catchError(() => of([] as ApplicationCatalogue[]))),
+      this.contexte.charger().pipe(
+        map((reponse) => reponse.applications || []),
+        catchError(() => of([] as ApplicationCatalogue[]))
+      ),
       this.dico.objets().pipe(catchError(() => of([] as DicoObjet[]))),
     ]).subscribe({
       next: ([detail, applications, objets]) => {
