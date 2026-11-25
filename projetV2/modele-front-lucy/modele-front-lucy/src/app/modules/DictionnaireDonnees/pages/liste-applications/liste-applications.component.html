@@ -1,0 +1,129 @@
+<section class="liste-page">
+  <header class="liste-heading">
+    <h1>Dictionnaire de données</h1>
+    <a class="button-primary" routerLink="/dictionnaire/nouvelle">+ Nouvelle application</a>
+  </header>
+
+  <p class="notice notice-warning" *ngIf="!chargement && !erreur && !referentielDisponible" role="status">
+    Le référentiel officiel des applications est illisible : les statuts affichés ne sont pas fiables.
+  </p>
+  <p class="notice notice-info" *ngIf="!chargement && !erreur && referentielDisponible && !catalogueOracleDisponible" role="status">
+    Le catalogue Oracle est indisponible : les compteurs d’objets ne sont pas fiables.
+  </p>
+
+  <p class="state-message" *ngIf="chargement" role="status" aria-live="polite">Chargement des applications…</p>
+  <div class="notice notice-error" *ngIf="erreur" role="alert">
+    {{ erreur }}
+    <button type="button" class="button-secondary" (click)="charger()">Réessayer</button>
+  </div>
+
+  <ng-container *ngIf="!chargement && !erreur">
+    <div class="kpis" role="group" aria-label="Indicateurs : filtrer par statut">
+      <button type="button" class="kpi kpi-total" [attr.aria-pressed]="statutFiltre === ''" (click)="choisirStatut('')">
+        <span class="kpi-label">Applications</span>
+        <span class="kpi-value">{{ formater(compter('')) }}</span>
+      </button>
+      <button type="button" class="kpi kpi-documented" [attr.aria-pressed]="statutFiltre === 'EXISTANTE_DOCUMENTEE'"
+        (click)="choisirStatut('EXISTANTE_DOCUMENTEE')">
+        <span class="kpi-label">Documentées</span>
+        <span class="kpi-value">{{ formater(compter('EXISTANTE_DOCUMENTEE')) }}</span>
+      </button>
+      <button type="button" class="kpi kpi-todo" [attr.aria-pressed]="statutFiltre === 'EXISTANTE_NON_DOCUMENTEE'"
+        (click)="choisirStatut('EXISTANTE_NON_DOCUMENTEE')">
+        <span class="kpi-label">À documenter</span>
+        <span class="kpi-value">{{ formater(compter('EXISTANTE_NON_DOCUMENTEE')) }}</span>
+      </button>
+      <button type="button" class="kpi kpi-design" [attr.aria-pressed]="statutFiltre === 'EN_CONCEPTION'"
+        (click)="choisirStatut('EN_CONCEPTION')">
+        <span class="kpi-label">En conception</span>
+        <span class="kpi-value">{{ formater(compter('EN_CONCEPTION')) }}</span>
+      </button>
+    </div>
+
+    <div class="liste-grid">
+      <form class="filters" (submit)="$event.preventDefault()" aria-label="Filtres">
+        <label for="recherche-app">Recherche</label>
+        <input id="recherche-app" type="search" placeholder="Code ou libellé"
+          [ngModel]="recherche" (ngModelChange)="surRecherche($event)" name="recherche" autocomplete="off" />
+
+        <fieldset>
+          <legend>Statut</legend>
+          <label class="radio" *ngFor="let s of statuts; let i = index" [attr.for]="'statut-' + i">
+            <input type="radio" name="statut" [id]="'statut-' + i" [value]="s.valeur"
+              [checked]="statutFiltre === s.valeur" (change)="choisirStatut(s.valeur)" />
+            {{ s.libelle }}
+          </label>
+        </fieldset>
+
+        <label for="schema-app">Schéma</label>
+        <select id="schema-app" name="schema" [ngModel]="schemaFiltre" (ngModelChange)="surSchema($event)">
+          <option value="">Tous</option>
+          <option *ngFor="let s of schemasDisponibles" [value]="s">{{ s }}</option>
+        </select>
+      </form>
+
+      <div class="results">
+        <div class="empty-state" *ngIf="applicationsFiltrees.length === 0">
+          <h2>Aucune application</h2>
+          <p *ngIf="statutFiltre === 'EN_CONCEPTION' && !recherche.trim() && !schemaFiltre">
+            Aucune application n’est en conception.
+          </p>
+          <p *ngIf="!(statutFiltre === 'EN_CONCEPTION' && !recherche.trim() && !schemaFiltre)">
+            Aucune application ne correspond aux critères sélectionnés.
+          </p>
+          <p>
+            <a class="button-primary" *ngIf="statutFiltre === 'EN_CONCEPTION'" routerLink="/dictionnaire/nouvelle">+ Nouvelle application</a>
+            <button type="button" class="button-secondary" *ngIf="filtreActif" (click)="reinitialiser()">Réinitialiser les filtres</button>
+          </p>
+        </div>
+
+        <div class="table-card" *ngIf="applicationsFiltrees.length > 0">
+          <div class="table-scroll">
+            <table class="liste-table">
+              <thead>
+                <tr>
+                  <th scope="col">Application</th>
+                  <th scope="col">Statut</th>
+                  <th scope="col">Objets</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let app of applicationsPaginees">
+                  <td>
+                    <a class="application-link" [routerLink]="['/dictionnaire', app.code]">
+                      <strong>{{ app.code }}</strong>
+                      <span>{{ app.libelle }}</span>
+                    </a>
+                  </td>
+                  <td>
+                    <span class="status-badge"
+                      [class.status-documented]="app.statut === 'EXISTANTE_DOCUMENTEE'"
+                      [class.status-undocumented]="app.statut === 'EXISTANTE_NON_DOCUMENTEE'"
+                      [class.status-design]="app.statut === 'EN_CONCEPTION'">{{ libelleStatut(app.statut) }}</span>
+                  </td>
+                  <td>{{ app.nbObjets }}</td>
+                  <td>
+                    <a class="action-button" [class.action-primary]="app.statut === 'EXISTANTE_NON_DOCUMENTEE'"
+                      [routerLink]="cibleAction(app)"
+                      [attr.aria-label]="libelleAction(app.statut) + ' ' + app.code">{{ libelleAction(app.statut) }}</a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <nav class="pagination" aria-label="Pagination" *ngIf="totalPages > 1">
+          <button type="button" [disabled]="pageEffective <= 1" (click)="allerAPage(pageEffective - 1)">Précédent</button>
+          <ng-container *ngFor="let p of pagesAffichees">
+            <span *ngIf="p === null" aria-hidden="true">…</span>
+            <button type="button" *ngIf="p !== null" [class.active]="p === pageEffective"
+              [attr.aria-current]="p === pageEffective ? 'page' : null" (click)="allerAPage(p)">{{ p }}</button>
+          </ng-container>
+          <button type="button" [disabled]="pageEffective >= totalPages" (click)="allerAPage(pageEffective + 1)">Suivant</button>
+        </nav>
+      </div>
+    </div>
+  </ng-container>
+</section>

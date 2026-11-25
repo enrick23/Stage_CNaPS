@@ -2,7 +2,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { DictionnaireDonneesComponent } from './pages/dictionnaire-donnees/dictionnaire-donnees.component';
 import { DictionnaireShellComponent } from './pages/shell/dictionnaire-shell.component';
-import { CatalogueComponent } from './pages/catalogue/catalogue.component';
+import { ListeApplicationsComponent } from './pages/liste-applications/liste-applications.component';
 import { FicheObjetPageComponent } from './pages/fiche-objet-page/fiche-objet-page.component';
 
 import { ApplicationShellComponent } from './pages/application-shell/application-shell.component';
@@ -19,8 +19,7 @@ const routes: Routes = [
     component: DictionnaireShellComponent,
     children: [
       // Les segments réservés sont déclarés AVANT le paramètre :application (voir SEGMENTS_RESERVES).
-      // Provisoire (T17) : la liste est l'ancien catalogue.
-      { path: '', component: CatalogueComponent, pathMatch: 'full' },
+      { path: '', component: ListeApplicationsComponent, pathMatch: 'full' },
       { path: 'nouvelle', component: NouvelleApplicationComponent },
       // Ancienne page conservée telle quelle pendant la migration
       { path: 'ancien', component: DictionnaireDonneesComponent },

@@ -10,6 +10,7 @@ import { FicheApplicationComponent } from './pages/fiche-application/fiche-appli
 import { DocumenterComponent } from './pages/documenter/documenter.component';
 import { ExportComponent } from './pages/export/export.component';
 import { FicheObjetComponent } from './components/fiche-objet/fiche-objet.component';
+import { ListeApplicationsComponent } from './pages/liste-applications/liste-applications.component';
 import { ApplicationShellComponent } from './pages/application-shell/application-shell.component';
 import { ObjetsApplicationComponent } from './pages/objets-application/objets-application.component';
 import { DocumenterApplicationComponent } from './pages/documenter-application/documenter-application.component';
@@ -30,6 +31,7 @@ import { FicheObjetPageComponent } from './pages/fiche-objet-page/fiche-objet-pa
     ExportComponent,
     FicheObjetComponent,
     FicheObjetPageComponent,
+    ListeApplicationsComponent,
     ApplicationShellComponent,
     ObjetsApplicationComponent,
     DocumenterApplicationComponent,
