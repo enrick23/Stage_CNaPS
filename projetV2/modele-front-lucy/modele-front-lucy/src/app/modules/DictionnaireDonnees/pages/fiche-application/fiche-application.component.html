@@ -87,19 +87,18 @@
       <form (ngSubmit)="rattacherAuReferentiel()">
         <div class="promotion-fields">
           <label for="code-reference-promotion">Application existante du référentiel</label>
-          <select
+          <app-searchable-select
             id="code-reference-promotion"
             name="codeRefSelectionne"
-            [(ngModel)]="codeRefSelectionne"
-            (ngModelChange)="choisirCodeRef($event)"
+            [options]="applicationsDisponibles"
+            valueField="code"
+            labelField="libelle"
+            [value]="codeRefSelectionne"
+            placeholder="Sélectionner un code disponible…"
+            searchPlaceholder="Rechercher une application…"
             [disabled]="!referentielDisponible || rattachementEnCours || !applicationsDisponibles.length"
-            required
-          >
-            <option value="">Sélectionner un code disponible…</option>
-            <option *ngFor="let app of applicationsDisponibles" [value]="app.code">
-              {{ app.libelle }} ({{ app.code }})
-            </option>
-          </select>
+            (valueChange)="choisirCodeRef($event)">
+          </app-searchable-select>
         </div>
         <p class="field-help" *ngIf="referentielDisponible && !applicationsDisponibles.length">
           Aucun code non documenté n’est disponible. Un code déjà rattaché à une autre APP_ID ne peut pas être réutilisé.

@@ -63,18 +63,17 @@
 
     <div class="application-picker card">
       <label for="application-existante">Application à documenter</label>
-      <select
+      <app-searchable-select
         id="application-existante"
-        [ngModel]="codeApplicationRef"
-        [ngModelOptions]="{ standalone: true }"
-        (ngModelChange)="choisirApplicationIa($event)"
+        [options]="applicationsExistantes"
+        valueField="code"
+        labelField="libelle"
+        [value]="codeApplicationRef"
+        placeholder="Sélectionner une application existante…"
+        searchPlaceholder="Rechercher une application…"
         [disabled]="catalogueEnChargement || !referentielDisponible"
-      >
-        <option value="">Sélectionner une application existante…</option>
-        <option *ngFor="let app of applicationsExistantes" [value]="app.code">
-          {{ app.libelle }} ({{ app.code }})
-        </option>
-      </select>
+        (valueChange)="choisirApplicationIa($event)">
+      </app-searchable-select>
       <p class="field-help" *ngIf="catalogueEnChargement">Chargement du référentiel…</p>
       <p class="field-error" *ngIf="erreurCatalogue">{{ erreurCatalogue }}</p>
       <p class="field-help" *ngIf="!catalogueEnChargement && referentielDisponible && !applicationsExistantes.length">
@@ -145,11 +144,14 @@
 
           <div class="ia-form" *ngIf="modeSaisieIa === 'oracle'">
             <label for="schema-oracle">Schéma Oracle</label>
-            <select id="schema-oracle" [(ngModel)]="schemaOracle" [ngModelOptions]="{ standalone: true }"
-              [disabled]="schemasEnChargement || !schemas.length">
-              <option value="">Sélectionner un schéma…</option>
-              <option *ngFor="let schema of schemas" [value]="schema">{{ schema }}</option>
-            </select>
+            <app-searchable-select
+              [options]="schemas"
+              [value]="schemaOracle"
+              placeholder="Sélectionner un schéma…"
+              searchPlaceholder="Rechercher un schéma dans la base…"
+              [disabled]="schemasEnChargement || !schemas.length"
+              (valueChange)="schemaOracle = $event">
+            </app-searchable-select>
             <p class="field-error" *ngIf="erreurSchemas">{{ erreurSchemas }}</p>
             <label for="nom-objet-oracle">Nom de la table ou vue</label>
             <input id="nom-objet-oracle" type="text" [(ngModel)]="nomObjetOracle"
@@ -296,11 +298,14 @@
           </div>
           <div class="field">
             <label for="schema-formulaire">Schéma Oracle propriétaire <span aria-hidden="true">*</span></label>
-            <select id="schema-formulaire" name="formSchema" [(ngModel)]="formSchema"
-              [disabled]="schemasEnChargement || !schemas.length" required>
-              <option value="">Sélectionner un schéma…</option>
-              <option *ngFor="let schema of schemas" [value]="schema">{{ schema }}</option>
-            </select>
+            <app-searchable-select
+              [options]="schemas"
+              [value]="formSchema"
+              placeholder="Sélectionner un schéma…"
+              searchPlaceholder="Rechercher un schéma dans la base…"
+              [disabled]="schemasEnChargement || !schemas.length"
+              (valueChange)="formSchema = $event">
+            </app-searchable-select>
             <small class="field-error" *ngIf="erreurSchemas">{{ erreurSchemas }}</small>
           </div>
           <div class="field field-full">
@@ -368,20 +373,34 @@
                 <td>{{ i + 1 }}</td>
                 <td><input [name]="'colNom' + i" [(ngModel)]="colonne.nom" aria-label="Nom de colonne" required /></td>
                 <td>
-                  <select [name]="'colType' + i" [(ngModel)]="colonne.typeBase" aria-label="Type Oracle">
-                    <option *ngFor="let type of typesDisponibles" [value]="type">{{ type }}</option>
-                  </select>
+                  <app-searchable-select
+                    [options]="typesDisponibles"
+                    [value]="colonne.typeBase"
+                    placeholder="Type Oracle"
+                    searchPlaceholder="Rechercher un type…"
+                    (valueChange)="colonne.typeBase = $event">
+                  </app-searchable-select>
                 </td>
                 <td><input [name]="'colTaille' + i" [(ngModel)]="colonne.taille" aria-label="Taille" /></td>
                 <td>
-                  <select [name]="'colContrainte' + i" [(ngModel)]="colonne.contrainte" aria-label="Contrainte">
-                    <option *ngFor="let contrainte of contraintesDisponibles" [value]="contrainte">{{ contrainte || 'Aucune' }}</option>
-                  </select>
+                  <app-searchable-select
+                    [options]="contraintesDisponibles"
+                    [value]="colonne.contrainte"
+                    placeholder="Aucune"
+                    searchPlaceholder="Rechercher une contrainte…"
+                    (valueChange)="colonne.contrainte = $event">
+                  </app-searchable-select>
                 </td>
                 <td>
-                  <select [name]="'colSensibilite' + i" [(ngModel)]="colonne.niveauSensibilite" aria-label="Sensibilité">
-                    <option *ngFor="let niveau of niveauxSensibilite" [ngValue]="niveau.valeur">{{ niveau.libelle }}</option>
-                  </select>
+                  <app-searchable-select
+                    [options]="niveauxSensibilite"
+                    valueField="valeur"
+                    labelField="libelle"
+                    [value]="colonne.niveauSensibilite"
+                    placeholder="Sensibilité"
+                    searchPlaceholder="Rechercher une sensibilité…"
+                    (valueChange)="colonne.niveauSensibilite = $event">
+                  </app-searchable-select>
                 </td>
                 <td><input [name]="'colDefaut' + i" [(ngModel)]="colonne.defaut" aria-label="Valeur par défaut" /></td>
                 <td><input [name]="'colDescription' + i" [(ngModel)]="colonne.description" aria-label="Description de la colonne" /></td>

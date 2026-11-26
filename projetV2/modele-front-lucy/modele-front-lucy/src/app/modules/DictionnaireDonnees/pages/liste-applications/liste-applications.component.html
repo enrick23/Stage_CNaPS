@@ -56,10 +56,14 @@
         </fieldset>
 
         <label for="schema-app">Schéma</label>
-        <select id="schema-app" name="schema" [ngModel]="schemaFiltre" (ngModelChange)="surSchema($event)">
-          <option value="">Tous</option>
-          <option *ngFor="let s of schemasDisponibles" [value]="s">{{ s }}</option>
-        </select>
+        <app-searchable-select
+          name="schema"
+          [options]="schemasDisponiblesAvecTous"
+          [value]="schemaFiltre"
+          placeholder="Tous"
+          searchPlaceholder="Rechercher un schéma…"
+          (valueChange)="surSchema($event)">
+        </app-searchable-select>
       </form>
 
       <div class="results">

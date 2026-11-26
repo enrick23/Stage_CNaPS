@@ -416,13 +416,13 @@
                 </td>
                 <!-- Colonne F : TYPE -->
                 <td>
-                  <select
-                    [(ngModel)]="col.typeBase"
-                    name="col_type_{{ idx }}"
-                    class="table-input"
-                  >
-                    <option *ngFor="let t of typesDisponibles" [value]="t">{{ t }}</option>
-                  </select>
+                  <app-searchable-select
+                    [options]="typesDisponibles"
+                    [value]="col.typeBase"
+                    placeholder="Type"
+                    searchPlaceholder="Rechercher un type…"
+                    (valueChange)="col.typeBase = $event">
+                  </app-searchable-select>
                 </td>
                 <!-- Colonne G : TAILLE -->
                 <td>
@@ -436,30 +436,25 @@
                 </td>
                 <!-- Colonne H : CONTRAINTE -->
                 <td>
-                  <select
-                    [(ngModel)]="col.contrainte"
-                    name="col_contrainte_{{ idx }}"
-                    class="table-input"
-                  >
-                    <option *ngFor="let c of contraintesDisponibles" [value]="c">
-                      {{ c || '— Aucune —' }}
-                    </option>
-                  </select>
+                  <app-searchable-select
+                    [options]="contraintesDisponibles"
+                    [value]="col.contrainte"
+                    placeholder="Aucune"
+                    searchPlaceholder="Rechercher une contrainte…"
+                    (valueChange)="col.contrainte = $event">
+                  </app-searchable-select>
                 </td>
                 <!-- Colonne E : SENSIBILITE -->
                 <td>
-                  <select
-                    [(ngModel)]="col.niveauSensibilite"
-                    name="col_sensib_{{ idx }}"
-                    class="table-input"
-                  >
-                    <option
-                      *ngFor="let s of niveauxSensibilite"
-                      [ngValue]="s.valeur"
-                    >
-                      {{ s.libelle }}
-                    </option>
-                  </select>
+                  <app-searchable-select
+                    [options]="niveauxSensibilite"
+                    valueField="valeur"
+                    labelField="libelle"
+                    [value]="col.niveauSensibilite"
+                    placeholder="Sensibilité"
+                    searchPlaceholder="Rechercher une sensibilité…"
+                    (valueChange)="col.niveauSensibilite = $event">
+                  </app-searchable-select>
                 </td>
                 <!-- Colonne I : VALEUR PAR DEFAUT -->
                 <td>

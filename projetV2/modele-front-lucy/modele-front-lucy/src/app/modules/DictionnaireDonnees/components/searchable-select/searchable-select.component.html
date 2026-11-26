@@ -1,0 +1,30 @@
+<div class="searchable-select" [class.open]="ouvert" [class.disabled]="disabled">
+  <button type="button"
+    class="selected-value"
+    [attr.aria-expanded]="ouvert"
+    [attr.name]="name || null"
+    [disabled]="disabled"
+    (click)="ouvrir()">
+    <span [class.placeholder]="!value">{{ labelSelection || placeholder }}</span>
+    <span class="chevron" aria-hidden="true"></span>
+  </button>
+
+  <div class="dropdown" *ngIf="ouvert">
+    <input type="search"
+      class="search-input"
+      [(ngModel)]="recherche"
+      [placeholder]="searchPlaceholder"
+      autocomplete="off"
+      aria-label="Rechercher une option" />
+    <div class="options" role="listbox">
+      <button type="button"
+        class="option"
+        *ngFor="let option of optionsFiltrees"
+        [class.selected]="extraireValeur(option) === value"
+        (click)="choisir(option)">
+        {{ extraireLibelle(option) }}
+      </button>
+      <p class="no-result" *ngIf="optionsFiltrees.length === 0">Aucun résultat</p>
+    </div>
+  </div>
+</div>

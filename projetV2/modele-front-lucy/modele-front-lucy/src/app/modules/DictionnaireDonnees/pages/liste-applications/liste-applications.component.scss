@@ -145,11 +145,19 @@
   }
 
   legend {
-    padding: 0;
-    margin-bottom: 6px;
-    color: #475569;
-    font-weight: 700;
+    width: auto;
+    float: none;
+    padding: 0 !important;
+    margin: 0 0 6px !important;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #64748b;
+    font-family: inherit;
+    font-weight: 600;
     font-size: 14px;
+    text-transform: none;
   }
 
   input[type='search'],
@@ -164,9 +172,11 @@
   }
 
   fieldset {
-    margin: 8px 0;
-    padding: 0;
-    border: 0;
+    margin: 8px 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
   }
 
   .radio {
@@ -179,8 +189,11 @@
     cursor: pointer;
 
     input {
+      position: static !important;
       width: 18px;
       height: 18px;
+      opacity: 1 !important;
+      visibility: visible !important;
       accent-color: var(--b);
     }
   }

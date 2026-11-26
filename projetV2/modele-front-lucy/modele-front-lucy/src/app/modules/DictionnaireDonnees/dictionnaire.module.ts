@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SearchableSelectComponent } from './components/searchable-select/searchable-select.component';
 import { DictionnaireRoutingModule } from './dictionnaire-routing.module';
 import { DictionnaireDonneesComponent } from './pages/dictionnaire-donnees/dictionnaire-donnees.component';
 import { DictionnaireShellComponent } from './pages/shell/dictionnaire-shell.component';
@@ -23,6 +24,7 @@ import { FicheObjetPageComponent } from './pages/fiche-objet-page/fiche-objet-pa
 @NgModule({
   declarations: [
     DictionnaireDonneesComponent,
+    SearchableSelectComponent,
     DictionnaireShellComponent,
     AccueilComponent,
     CatalogueComponent,

@@ -113,6 +113,10 @@ export class ListeApplicationsComponent implements OnInit, OnDestroy {
     return Object.keys(ensemble).sort();
   }
 
+  get schemasDisponiblesAvecTous(): string[] {
+    return [''].concat(this.schemasDisponibles);
+  }
+
   get applicationsFiltrees(): ApplicationCatalogue[] {
     const terme = this.normaliser(this.recherche);
     return this.applications.filter((app) => {
